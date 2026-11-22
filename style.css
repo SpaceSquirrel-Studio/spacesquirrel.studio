@@ -22,36 +22,51 @@ a:hover{color:var(--ink)}
    --head-stuck is the height left on screen, which anchors scroll clear of.
    The border-image paints the bar's background out to both edges of the window
    without widening the page; a line under it fades in once the page scrolls. */
-:root{--head-stuck:4.375rem}
+:root{--head-stuck:calc(var(--ring-d) + 12px)}
 html{scroll-padding-top:calc(var(--head-stuck) + .5rem)}
 @property --head-edge{syntax:"<color>";inherits:false;initial-value:#3D3D3D}
-.site-head{position:sticky;top:0;z-index:20;--head-edge:var(--line);border-image:linear-gradient(to top,var(--head-edge) 1px,var(--sky) 1px) fill 0//0 100vmax;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.25rem 0}
+/* tall enough for the helmet's ring with 6px to spare above and below (see below) */
+.site-head{position:sticky;top:0;z-index:20;--head-edge:var(--line);border-image:linear-gradient(to top,var(--head-edge) 1px,var(--sky) 1px) fill 0//0 100vmax;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:calc((var(--ring-d) - var(--mark-h)) / 2 + 6px) 0}
 @supports (animation-timeline:scroll()){
   .site-head{animation:head-edge linear both;animation-timeline:scroll();animation-range:0 3rem}
   @keyframes head-edge{from{--head-edge:var(--sky)}}
 }
 .wordmark{font:800 1.5rem/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:.55rem}
-.wordmark img{height:30px;width:auto;display:block}
-/* The helmet logo at the start of the wordmark, turned to face the name, the wordmark's orange line
-   running out behind it as its trail. Greg, 22 November 2026: "to the left of the space squirrel
-   wordmark, over the orange dash in that area. Big enough to read well", then "flip the logo above the
-   start of space squirrel. And keep the orange line that was there. Just make it behind the logo".
-   --logo is its height in wordmark heights; it stands into the bar's padding, so the bar keeps its
-   height. Its right edge is at 14% of the wordmark's width, so the line shows on both sides of it
-   before the S (the line ends at 16.5%); 16% until Greg, the same day: "it needs to be offset to the
-   left a bit". A share of the width, so it scales with the wordmark on a phone too. */
-:root{--logo:1.7}
+.wordmark img{height:var(--mark-h);width:auto;display:block}
+/* The helmet logo at the start of the wordmark, turned to face the name, in an orange ring the color
+   of the wordmark's stripe, the stripe's line running out from behind it to the name. Greg, 22
+   November 2026: "to the left of the space squirrel wordmark, over the orange dash in that area. Big
+   enough to read well", then "flip the logo above the start of space squirrel. And keep the orange
+   line that was there. Just make it behind the logo", "it needs to be offset to the left a bit", and
+   "try a ring around the helmet ... It may make that top bar thicker but that's ok".
+   One <img>: its border is the ring, its padding places the helmet in it, and its background (the
+   bar's color) hides the line inside the ring. Every size is in wordmark heights (--mark-h), so a
+   phone's smaller wordmark scales it all:
+   - --logo: the helmet's height (H).
+   - The smallest circle round the helmet's outline has a radius of .5841 H, its center .5509 H from
+     the image's left and .4753 H from its top (measured on brand/spacesquirrel_logo.png; the image is
+     .946 H wide). The ring's inside is that circle plus --ring-gap; the padding puts that center in
+     the middle of the ring (left and right as the image is stored, before the flip mirrors both).
+   - The ring's center sits where the helmet's was, nudged left 1% of the wordmark's width so the ring
+     clears the S, the line showing between them. */
+:root{--mark-h:30px;--logo:1.7;--ring-gap:.04;--ring-line:calc(var(--mark-h) / 10);
+  --logo-h:calc(var(--logo) * var(--mark-h));
+  --ring-r:calc(var(--logo-h) * (.5841 + var(--ring-gap)));
+  --ring-d:calc(2 * (var(--ring-r) + var(--ring-line)))}
 .wordmark{position:relative}
-.wordmark img.logo{position:absolute;left:14%;top:50%;width:auto;height:calc(var(--logo) * 100%);transform:translate(-100%,-50%) scaleX(-1)}
+.wordmark img.logo{position:absolute;box-sizing:border-box;width:var(--ring-d);height:var(--ring-d);
+  left:calc(13% - var(--logo-h) * .5509);top:50%;transform:translate(-50%,-50%) scaleX(-1);
+  border:var(--ring-line) solid #B9573A;border-radius:50%;background:var(--sky);
+  padding:calc(var(--ring-r) - var(--logo-h) * .4753) calc(var(--ring-r) - var(--logo-h) * .3951)
+          calc(var(--ring-r) - var(--logo-h) * .5247) calc(var(--ring-r) - var(--logo-h) * .5509)}
 .site-nav{display:flex;gap:1.4rem;flex-wrap:wrap}
 @media (max-width:860px){
-  :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px)}
-  /* the wordmark scrolls away here, so its box grows to the helmet's height, and the bar scrolls that
-     much further up; otherwise the helmet's bottom would show at the top of the screen */
-  .site-head{flex-direction:column;align-items:flex-start;gap:.9rem;padding:1.25rem 0 .75rem;top:calc(-1.4rem - var(--mark-w) * 127 / 1933 * var(--logo))}
-  .wordmark{padding-block:calc(var(--mark-w) * 127 / 1933 * (var(--logo) - 1) / 2)}
-  .wordmark img.logo{height:100%}
-  .wordmark img{width:var(--mark-w);height:calc(var(--mark-w) * 127 / 1933)}
+  :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px);--mark-h:calc(var(--mark-w) * 127 / 1933)}
+  /* the wordmark scrolls away here, so its box grows to the ring's height, and the bar scrolls that
+     much further up; otherwise the ring's bottom would show at the top of the screen */
+  .site-head{flex-direction:column;align-items:flex-start;gap:.9rem;padding:1.25rem 0 .75rem;top:calc(-1.4rem - var(--ring-d))}
+  .wordmark{padding-block:calc((var(--ring-d) - var(--mark-h)) / 2)}
+  .wordmark img{width:var(--mark-w);height:var(--mark-h)}
   .site-nav{gap:.35rem 1rem;font-size:1rem}
 }
 @media (max-width:360px){.site-nav{gap:.35rem .6rem}.site-head .site-nav .product-link img{height:26px}}
