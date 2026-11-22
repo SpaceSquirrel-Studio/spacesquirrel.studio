@@ -25,35 +25,34 @@ a:hover{color:var(--ink)}
 :root{--head-stuck:calc(var(--ring-d) + 12px)}
 html{scroll-padding-top:calc(var(--head-stuck) + .5rem)}
 @property --head-edge{syntax:"<color>";inherits:false;initial-value:#3D3D3D}
-/* tall enough for the helmet's ring with 6px to spare above and below (see below) */
-.site-head{position:sticky;top:0;z-index:20;--head-edge:var(--line);border-image:linear-gradient(to top,var(--head-edge) 1px,var(--sky) 1px) fill 0//0 100vmax;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:calc((var(--ring-d) - var(--mark-h)) / 2 + 6px) 0}
+/* the logo's ring, the tallest thing in it, with 6px to spare above and below (see below) */
+.site-head{position:sticky;top:0;z-index:20;--head-edge:var(--line);border-image:linear-gradient(to top,var(--head-edge) 1px,var(--sky) 1px) fill 0//0 100vmax;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:6px 0}
 @supports (animation-timeline:scroll()){
   .site-head{animation:head-edge linear both;animation-timeline:scroll();animation-range:0 3rem}
   @keyframes head-edge{from{--head-edge:var(--sky)}}
 }
-.wordmark{font:800 1.5rem/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:.55rem}
+.wordmark{font:800 1.5rem/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:var(--logo-gap)}
 .wordmark img{height:var(--mark-h);width:auto;display:block}
-/* The logo - the helmet in its orange ring (Greg's own, brand/spacesquirrel_logo_ring.png) - at the
-   start of the wordmark, facing the name, the wordmark's orange line running behind it. Greg, 22
-   November 2026: "to the left of the space squirrel wordmark, over the orange dash in that area. Big
-   enough to read well", then "flip the logo above the start of space squirrel. And keep the orange
-   line that was there. Just make it behind the logo", "it needs to be offset to the left a bit", "try
-   a ring around the helmet ... It may make that top bar thicker but that's ok", and with his ringed
-   version: "you can leave the orange wordmark tail behind this".
-   --ring-d is the ring's diameter (the image is the ring's box) in wordmark heights (--mark-h), so a
-   phone's smaller wordmark scales it too. Its center is 6.85% of the wordmark's width in: the ring
-   just past the page edge, clear of the S, the line showing between them. */
-:root{--mark-h:30px;--ring-d:calc(var(--mark-h) * 2.33)}
-.wordmark{position:relative}
-.wordmark img.logo{position:absolute;width:var(--ring-d);height:var(--ring-d);left:6.85%;top:50%;transform:translate(-50%,-50%)}
+/* The logo - the helmet in its orange ring (Greg's own, brand/spacesquirrel_logo_ring.png) - then the
+   name. Greg, 22 November 2026, after trying it over the wordmark's left line: "the tail just doesn't
+   look very good ... Let's get rid of the tail and move the wordmark closer to the circle to match the
+   spacing between the L and the end of the center line".
+   The header's wordmark is a copy without that line (brand/spacesquirrel_wordmark_white_terra_no_left_dash.svg),
+   its viewBox starting at x 10, just left of the S (x 11.31 at its foot, after the italic slant).
+   Sizes are in wordmark heights (--mark-h), so a phone's smaller wordmark scales them too:
+   - --ring-d, the ring's diameter (the image is the ring's box).
+   - --logo-gap: in the wordmark, the L reaches x 1263.44 and the line starts at 1284.95, 21.51 units
+     apart (of the 127 the wordmark is tall). The ring's edge to the S's foot is the gap plus the 1.31
+     units before the S, so the gap is 20.2 units. */
+:root{--mark-h:30px;--ring-d:calc(var(--mark-h) * 2.33);--logo-gap:calc(var(--mark-h) * 20.2 / 127)}
+.wordmark img.logo{order:-1;flex:none;width:var(--ring-d);height:var(--ring-d)}
 .site-nav{display:flex;gap:1.4rem;flex-wrap:wrap}
 @media (max-width:860px){
-  :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px);--mark-h:calc(var(--mark-w) * 127 / 1933)}
-  /* the wordmark scrolls away here, so its box grows to the ring's height, and the bar scrolls that
-     much further up; otherwise the ring's bottom would show at the top of the screen */
+  /* --mark-w: the whole logo and name, ring to star, which is 15.12 wordmark heights
+     (2.33 ring + .159 gap + 1604 / 127 name) */
+  :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px);--mark-h:calc(var(--mark-w) / 15.12)}
+  /* the logo and name scroll away here (their row is the ring's height), the row of links staying */
   .site-head{flex-direction:column;align-items:flex-start;gap:.9rem;padding:1.25rem 0 .75rem;top:calc(-1.4rem - var(--ring-d))}
-  .wordmark{padding-block:calc((var(--ring-d) - var(--mark-h)) / 2)}
-  .wordmark img{width:var(--mark-w);height:var(--mark-h)}
   .site-nav{gap:.35rem 1rem;font-size:1rem}
 }
 @media (max-width:360px){.site-nav{gap:.35rem .6rem}.site-head .site-nav .product-link img{height:26px}}
