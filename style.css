@@ -37,11 +37,12 @@ html{scroll-padding-top:calc(var(--head-stuck) + .5rem)}
    wordmark, over the orange dash in that area. Big enough to read well", then "flip the logo above the
    start of space squirrel. And keep the orange line that was there. Just make it behind the logo".
    --logo is its height in wordmark heights; it stands into the bar's padding, so the bar keeps its
-   height. Its right edge is at 16% of the wordmark's width, just short of the S (the line ends at
-   16.5%), so it scales with the wordmark on a phone too. */
+   height. Its right edge is at 14% of the wordmark's width, so the line shows on both sides of it
+   before the S (the line ends at 16.5%); 16% until Greg, the same day: "it needs to be offset to the
+   left a bit". A share of the width, so it scales with the wordmark on a phone too. */
 :root{--logo:1.7}
 .wordmark{position:relative}
-.wordmark img.logo{position:absolute;left:16%;top:50%;width:auto;height:calc(var(--logo) * 100%);transform:translate(-100%,-50%) scaleX(-1)}
+.wordmark img.logo{position:absolute;left:14%;top:50%;width:auto;height:calc(var(--logo) * 100%);transform:translate(-100%,-50%) scaleX(-1)}
 .site-nav{display:flex;gap:1.4rem;flex-wrap:wrap}
 @media (max-width:860px){
   :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px)}
