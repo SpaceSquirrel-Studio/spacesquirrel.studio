@@ -33,32 +33,19 @@ html{scroll-padding-top:calc(var(--head-stuck) + .5rem)}
 }
 .wordmark{font:800 1.5rem/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:.55rem}
 .wordmark img{height:var(--mark-h);width:auto;display:block}
-/* The helmet logo at the start of the wordmark, turned to face the name, in an orange ring the color
-   of the wordmark's stripe, the stripe's line running out from behind it to the name. Greg, 22
+/* The logo - the helmet in its orange ring (Greg's own, brand/spacesquirrel_logo_ring.png) - at the
+   start of the wordmark, facing the name, the wordmark's orange line running behind it. Greg, 22
    November 2026: "to the left of the space squirrel wordmark, over the orange dash in that area. Big
    enough to read well", then "flip the logo above the start of space squirrel. And keep the orange
-   line that was there. Just make it behind the logo", "it needs to be offset to the left a bit", and
-   "try a ring around the helmet ... It may make that top bar thicker but that's ok".
-   One <img>: its border is the ring, its padding places the helmet in it, and its background (the
-   bar's color) hides the line inside the ring. Every size is in wordmark heights (--mark-h), so a
-   phone's smaller wordmark scales it all:
-   - --logo: the helmet's height (H).
-   - The smallest circle round the helmet's outline has a radius of .5841 H, its center .5509 H from
-     the image's left and .4753 H from its top (measured on brand/spacesquirrel_logo.png; the image is
-     .946 H wide). The ring's inside is that circle plus --ring-gap; the padding puts that center in
-     the middle of the ring (left and right as the image is stored, before the flip mirrors both).
-   - The ring's center sits where the helmet's was, nudged left 1% of the wordmark's width so the ring
-     clears the S, the line showing between them. */
-:root{--mark-h:30px;--logo:1.7;--ring-gap:.04;--ring-line:calc(var(--mark-h) / 10);
-  --logo-h:calc(var(--logo) * var(--mark-h));
-  --ring-r:calc(var(--logo-h) * (.5841 + var(--ring-gap)));
-  --ring-d:calc(2 * (var(--ring-r) + var(--ring-line)))}
+   line that was there. Just make it behind the logo", "it needs to be offset to the left a bit", "try
+   a ring around the helmet ... It may make that top bar thicker but that's ok", and with his ringed
+   version: "you can leave the orange wordmark tail behind this".
+   --ring-d is the ring's diameter (the image is the ring's box) in wordmark heights (--mark-h), so a
+   phone's smaller wordmark scales it too. Its center is 6.85% of the wordmark's width in: the ring
+   just past the page edge, clear of the S, the line showing between them. */
+:root{--mark-h:30px;--ring-d:calc(var(--mark-h) * 2.33)}
 .wordmark{position:relative}
-.wordmark img.logo{position:absolute;box-sizing:border-box;width:var(--ring-d);height:var(--ring-d);
-  left:calc(13% - var(--logo-h) * .5509);top:50%;transform:translate(-50%,-50%) scaleX(-1);
-  border:var(--ring-line) solid #B9573A;border-radius:50%;background:var(--sky);
-  padding:calc(var(--ring-r) - var(--logo-h) * .4753) calc(var(--ring-r) - var(--logo-h) * .3951)
-          calc(var(--ring-r) - var(--logo-h) * .5247) calc(var(--ring-r) - var(--logo-h) * .5509)}
+.wordmark img.logo{position:absolute;width:var(--ring-d);height:var(--ring-d);left:6.85%;top:50%;transform:translate(-50%,-50%)}
 .site-nav{display:flex;gap:1.4rem;flex-wrap:wrap}
 @media (max-width:860px){
   :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px);--mark-h:calc(var(--mark-w) * 127 / 1933)}
