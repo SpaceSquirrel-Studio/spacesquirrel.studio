@@ -32,20 +32,23 @@ html{scroll-padding-top:calc(var(--head-stuck) + .5rem)}
 }
 .wordmark{font:800 1.5rem/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:.55rem}
 .wordmark img{height:30px;width:auto;display:block}
-/* The helmet logo, where the wordmark's left dash was. Greg, 22 November 2026: "to the left of the
-   space squirrel wordmark, over the orange dash in that area. Big enough to read well". The header
-   uses a copy of the wordmark without that dash, which otherwise peeked out at the helmet's sides.
-   Twice the wordmark's height, standing into the bar's padding, so the bar keeps its height. */
+/* The helmet logo at the start of the wordmark, turned to face the name, the wordmark's orange line
+   running out behind it as its trail. Greg, 22 November 2026: "to the left of the space squirrel
+   wordmark, over the orange dash in that area. Big enough to read well", then "flip the logo above the
+   start of space squirrel. And keep the orange line that was there. Just make it behind the logo".
+   --logo is its height in wordmark heights; it stands into the bar's padding, so the bar keeps its
+   height. Its right edge is at 16% of the wordmark's width, just short of the S (the line ends at
+   16.5%), so it scales with the wordmark on a phone too. */
+:root{--logo:1.7}
 .wordmark{position:relative}
-.wordmark img.logo{position:absolute;left:0;top:50%;width:auto;height:200%;transform:translateY(-50%)}
+.wordmark img.logo{position:absolute;left:16%;top:50%;width:auto;height:calc(var(--logo) * 100%);transform:translate(-100%,-50%) scaleX(-1)}
 .site-nav{display:flex;gap:1.4rem;flex-wrap:wrap}
 @media (max-width:860px){
   :root{--head-stuck:3.4rem;--mark-w:min(100vw - 2rem,340px)}
-  /* the wordmark scrolls away here, so its box grows to hold the helmet (half the wordmark's height
-     above and below), and the bar scrolls that much further up; otherwise the helmet's bottom
-     would show at the top of the screen */
-  .site-head{flex-direction:column;align-items:flex-start;gap:.9rem;padding:1.25rem 0 .75rem;top:calc(-1.4rem - var(--mark-w) * 127 / 1933 * 2)}
-  .wordmark{padding-block:calc(var(--mark-w) * 127 / 1933 / 2)}
+  /* the wordmark scrolls away here, so its box grows to the helmet's height, and the bar scrolls that
+     much further up; otherwise the helmet's bottom would show at the top of the screen */
+  .site-head{flex-direction:column;align-items:flex-start;gap:.9rem;padding:1.25rem 0 .75rem;top:calc(-1.4rem - var(--mark-w) * 127 / 1933 * var(--logo))}
+  .wordmark{padding-block:calc(var(--mark-w) * 127 / 1933 * (var(--logo) - 1) / 2)}
   .wordmark img.logo{height:100%}
   .wordmark img{width:var(--mark-w);height:calc(var(--mark-w) * 127 / 1933)}
   .site-nav{gap:.35rem 1rem;font-size:1rem}
