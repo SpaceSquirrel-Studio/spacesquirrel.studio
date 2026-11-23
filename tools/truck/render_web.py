@@ -1,14 +1,17 @@
 """Render the truck's layers for the website's interactive graphic (truck.js), from the truck's
 saved .blend, opened in a background Blender and never saved (tools/README.md):
 
-    blender -b SemitruckCarToon.blend --factory-startup -P tools/truck/render_web.py -- <out dir> <mode> [size]
+    blender -b SemitruckCarToon.blend --factory-startup -P tools/truck/render_web.py -- <out dir> <mode> [width]
 
 mode "preview": one render of the framing, as the scene looks (AgX), with the ground.
 mode "layers":  every layer, linear light (Standard view, EXPOSURE stops down for headroom):
-  base_A / base_B      the truck with white / black paint, door shut, lights off, front wheels unseen
-  door_A_k / door_B_k  the same with the left door open k/8 (k = 1..8)
-  wheels_k             the front wheels alone (everything else a holdout), steered (k - 4) / 4
-  lights_on            base_B with the lights on (the page takes base_B from it: the lights' own light)
+  door_A_k / door_B_k  the truck on its ground, white / black paint, lights off, front wheels unseen,
+                       the left door open k / DOOR_FRAMES (k = 0 is shut)
+  door_T_k             the same without the ground: the truck's own shape, for its alpha
+  lights_on            door_B_0 with the lights on (the page takes door_B_0 from it: the lights' light)
+  wheels_k             the front wheels alone (everything else a holdout), steered from full left
+                       (k = 0) to full right (k = STEER_FRAMES - 1)
+pack_web.py turns them into the page's files.
 """
 import bpy, sys, os, math
 from mathutils import Vector, Matrix
@@ -18,36 +21,48 @@ OUT = argv[0]
 MODE = argv[1] if len(argv) > 1 else 'preview'
 RES = int(argv[2]) if len(argv) > 2 else 1000           # the width; the frame is 5:4
 EXPOSURE = -1.0            # one stop down: linear values to 2.0 fit in the 8 bits, the page puts it back
+# The page shows the nearest frame, never a blend of two. Greg, 22 November 2026: "as I use the
+# controls there are these semi transparent in-between frames that are very disorienting"
+DOOR_FRAMES = 16           # the door's positions past shut
+STEER_FRAMES = 17          # the wheels' positions, full left to full right
 os.makedirs(OUT, exist_ok=True)
 
 scene = bpy.context.scene
 O = bpy.data.objects
-body, door = O['Carpaint'], O['DL']
+body, door, ground = O['Carpaint'], O['DL'], O['Plane']
 
-# --- the camera: Greg's viewport, 22 November 2026, low at the truck's front left ---------------
-# Greg: "The top down 3/4 is disorienting. We need to be looking at from the attached angle." His
-# 3D View's view matrix, read from Blender. Its 50 mm viewport lens frames twice a 36 mm sensor's
-# width (Blender's perspective views are zoomed out 2x), so the camera is 25 mm, 72 degrees across.
-VIEW = Matrix(((0.87214, -0.06116, 0.48541, 3.82223),
-               (0.48881, 0.06691, -0.86982, -9.71989),
-               (0.02072, 0.99588, 0.08825, 2.29237),
+# --- the camera: Greg's viewport, low at the truck's front left -----------------------------------
+# Greg: "The top down 3/4 is disorienting. We need to be looking at from the attached angle", then
+# "the truck needs to look like it's sitting flat on the page" with his viewport lowered to 1.8 m and
+# all but level. His 3D View's view matrix, read from Blender, then made exactly level (no roll).
+# Its 50 mm viewport lens frames twice a 36 mm sensor's width (Blender's perspective views are
+# zoomed out 2x), so the camera starts at 25 mm; frame_truck() then zooms it in.
+VIEW = Matrix(((0.86695, 0.0045, 0.49837, 4.00288),
+               (0.49839, -0.01136, -0.86688, -9.95538),
+               (0.00176, 0.99993, -0.01209, 1.81667),
                (0.0, 0.0, 0.0, 1.0)))
+look = -(VIEW.to_3x3().col[2]).normalized()
+right = look.cross(Vector((0.0, 0.0, 1.0))).normalized()
+up = right.cross(look)
+LEVEL = Matrix((right, up, -look)).transposed().to_4x4()
+LEVEL.translation = VIEW.translation
 cam_data = bpy.data.cameras.new('Web Camera')
 cam_data.lens = 25.0
 cam_data.sensor_width = 36.0
 cam_data.sensor_fit = 'HORIZONTAL'
 cam = bpy.data.objects.new('Web Camera', cam_data)
 scene.collection.objects.link(cam)
-cam.matrix_world = VIEW
+cam.matrix_world = LEVEL
 scene.camera = cam
 
 r = scene.render
 r.resolution_x, r.resolution_y = RES, RES * 4 // 5
 r.resolution_percentage = 100
 
-# --- framing: from that same spot, zoomed in until the truck fills WIDTH of the frame, centered,
-# its wheels FLOOR above the bottom, so the page has room to stretch it upward (truck.js)
-WIDTH, FLOOR = 0.84, 0.06
+# --- framing: from that same spot, zoomed in until the truck fills WIDTH of the frame or all but
+# TOP and FLOOR of its height, whichever comes first, centered across, its wheels FLOOR above the
+# bottom: room for its shadow and reflection on the ground below it
+WIDTH, TOP, FLOOR = 0.82, 0.08, 0.15
 def frame_truck():
     from bpy_extras.object_utils import world_to_camera_view
     bpy.context.view_layer.update()
@@ -61,7 +76,7 @@ def frame_truck():
             p = world_to_camera_view(scene, cam, mw @ m.vertices[i].co)
             xs.append(p.x); ys.append(p.y)
         e.to_mesh_clear()
-    k = WIDTH / (max(xs) - min(xs))
+    k = min(WIDTH / (max(xs) - min(xs)), (1.0 - TOP - FLOOR) / (max(ys) - min(ys)))
     aspect = r.resolution_x / r.resolution_y
     cam_data.lens *= k
     cam_data.shift_x = ((min(xs) + max(xs)) / 2 - 0.5) * k
@@ -94,7 +109,6 @@ scene.view_settings.view_transform = 'Standard'
 scene.view_settings.look = 'None'
 scene.view_settings.exposure = EXPOSURE
 scene.view_settings.gamma = 1.0
-O['Plane'].hide_render = True                                   # the page draws its own soft shadow
 setp(body, 'Steer', 0.0); setp(door, 'Open', 0.0)
 setp(body, 'Paint Saturation', 0.0)
 
@@ -104,15 +118,19 @@ def paint(white):
 def lights(on):
     setp(body, 'Lights', 1.0 if on else 0.0)
 
-# the body layers: the front wheels unseen by the camera, still casting their shadows
+# the body on its ground: the front wheels unseen by the camera, still casting their shadows
 for n in FRONT:
     O[n].visible_camera = False
 lights(False)
-for k in range(9):
-    setp(door, 'Open', k / 8.0)
+for k in range(DOOR_FRAMES + 1):
+    setp(door, 'Open', k / DOOR_FRAMES)
+    ground.hide_render = False
     for white in (True, False):
         paint(white)
-        render(('base_' if k == 0 else 'door_') + ('A' if white else 'B') + ('' if k == 0 else '_%d' % k))
+        render('door_%s_%d' % ('A' if white else 'B', k))
+    ground.hide_render = True
+    render('door_T_%d' % k)
+ground.hide_render = False
 setp(door, 'Open', 0.0)
 paint(False); lights(True)
 render('lights_on')
@@ -126,7 +144,7 @@ for o in scene.objects:
     if o.type in {'MESH', 'CURVE', 'VOLUME'} and o.name not in FRONT and not o.hide_render:
         o.is_holdout = True
         held.append(o.name)
-for k in range(9):
-    setp(body, 'Steer', (k - 4) / 4.0)
+for k in range(STEER_FRAMES):
+    setp(body, 'Steer', -1.0 + 2.0 * k / (STEER_FRAMES - 1))
     render('wheels_%d' % k)
 print('held out', len(held), flush=True)

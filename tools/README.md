@@ -17,9 +17,11 @@ again. Edit `docs/docs.js` (the clip player) by hand; the build leaves it alone.
 
 The truck you can hover and drag on the home page (`truck.js`) is a set of
 renders in `truck/`: the truck with white and with black paint (so the page
-can recolor it), the door at eight more angles, the front wheels at nine
-steering angles, and the light the headlights add. Remake them after changing
-the truck in Blender. The page itself needs no change unless the camera moves.
+can recolor it), the door at 16 more angles, the front wheels at 17 steering
+angles (the page shows the nearest, never a blend of two), the floor under it
+with its shadow and reflection, and the light the headlights add. Remake them
+after changing the truck in Blender. Rendering takes about two minutes. The page
+reads the frame counts and sizes from `truck/truck.json`, so it needs no change.
 
 In **PowerShell** (Start menu, type `PowerShell`, open it), with the truck's
 `.blend` saved:

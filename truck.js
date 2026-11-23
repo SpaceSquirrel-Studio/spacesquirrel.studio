@@ -2,12 +2,14 @@
 // truck or its button up and down to squash it, sideways to lean it. Click the button for its menu:
 // Color, Lights, Door and Wheels.
 //
-// The truck is rendered in Blender as layers (truck/*.webp, made by the render and pack scripts):
-// the truck with white paint and with black paint, the door at eight more angles, the front wheels
-// at nine steering angles, and the light the headlights add. They are linear light one stop down;
-// this script composes them in linear light (a paint color is black paint plus the color times
-// the difference) and puts the stop back, so any color, the lights, the door and the wheels all
-// come out as Blender would render them. Squash and lean are a 2D squash and slant of the result.
+// The truck is rendered in Blender as layers (truck/*.webp, made by tools/truck): the truck with
+// white paint and with black paint, the door at more angles, the front wheels at many steering
+// angles, the ground under it (its shadow, and the truck's reflection) and the light the headlights
+// add. They are linear light one stop down; this script composes them in linear light (a paint color
+// is black paint plus the color times the difference) and puts the stop back, so any color, the
+// lights, the door and the wheels all come out as Blender would render them. The door and the
+// wheels show the frame nearest, never a blend. Squash and lean are a 2D squash and slant of the
+// truck; the ground stays put under it.
 //
 // The buttons are drawn as Kneady draws its own (Kneady's draw.py, _draw_buttons): a dark circle
 // edged in the region's color, its icon in a lighter shade of that color with a dark edge, filled
@@ -59,28 +61,38 @@
   for (let i = 0; i <= 4096; i++) { const l = i / 4096; ENC[i] = Math.round(255 * (l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055)); }
   const enc = l => ENC[l <= 0 ? 0 : l >= 1 ? 4096 : (l * 4096 + 0.5) | 0];
 
+  // an image, once loaded. Its load event, not decode(): decode() turned down good images when
+  // several large ones were decoding at once ("The source image cannot be decoded")
   function image(name) {
-    const img = new Image();
-    img.decoding = 'async';
-    img.src = ROOT + name + '.webp' + VERSION;
-    return img.decode().then(() => img);
+    return new Promise((done, fail) => {
+      const img = new Image();
+      img.onload = () => done(img);
+      img.onerror = () => fail(new Error('could not load ' + name));
+      img.src = ROOT + name + '.webp' + VERSION;
+    });
   }
-  // premultiplied linear color (3 a pixel) and alpha, from an image's straight sRGB bytes
-  function decode(img, opaque) {
+  // an image's straight sRGB bytes, 4 a pixel
+  function pixels(img) {
     const c = document.createElement('canvas');
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     const x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);
-    const d = x.getImageData(0, 0, c.width, c.height).data, n = d.length / 4;
+    return { d: x.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height };
+  }
+  // premultiplied linear color (3 a pixel) and alpha: for the layers read at every pixel
+  function decode(img, opaque) {
+    const { d, w, h } = pixels(img), n = d.length / 4;
     const p = new Float32Array(n * 3), a = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const al = opaque ? 1 : d[4 * i + 3] / 255;
       a[i] = al;
       p[3 * i] = LIN[d[4 * i]] * al; p[3 * i + 1] = LIN[d[4 * i + 1]] * al; p[3 * i + 2] = LIN[d[4 * i + 2]] * al;
     }
-    return { p, a, w: c.width, h: c.height };
+    return { p, a, w, h };
   }
-  const L = { doorA: [], doorB: [], wheels: [] };   // decoded layers, filled as they load
+  // the truck, its ground and its lights decoded; the door's and the wheels' many frames kept as
+  // bytes (a quarter of the memory), decoded at the pixels a frame covers
+  const L = { doorA: [], doorB: [], wheels: [] };
 
   // ----- composing -----
   let work = null, composed = null, tint = null, cImg = null, tImg = null, mask = null;
@@ -95,30 +107,48 @@
     const p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
     return [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i % 6];
   }
-  // the two loaded frames a value 0..1 falls between, over n steps, and how far between them;
-  // `frame(k)` gives frame k, or undefined while it is still loading
-  function between(v, n, frame) {
-    const f = Math.min(Math.max(v, 0), 1) * n;
-    let i = Math.min(Math.floor(f), n - 1), t = f - i;
-    let f0 = frame(i), f1 = frame(i + 1);
-    if (f0 === undefined) { i = 0; while (i <= n && frame(i) === undefined) i++; f0 = frame(i); f1 = f0; t = 0; }
-    if (f1 === undefined) { f1 = f0; t = 0; }
-    return [f0, f1, t];
+  // The frame nearest a value 0..1 over n steps, or the nearest loaded one. Never a blend of two:
+  // Greg, 22 November 2026: "as I use the controls there are these semi transparent in-between
+  // frames that are very disorienting". `frame(k)` is undefined while frame k is loading.
+  function nearest(v, n, frame) {
+    const want = Math.round(Math.min(Math.max(v, 0), 1) * n);
+    for (let off = 0; off <= n; off++) {
+      if (want - off >= 0 && frame(want - off) !== undefined) return frame(want - off);
+      if (want + off <= n && frame(want + off) !== undefined) return frame(want + off);
+    }
   }
-  // the door's frame k: 0 is the truck itself (null), 1..8 its crops once loaded
-  const doorFrame = k => k === 0 ? null : L.doorA[k - 1] && L.doorB[k - 1] ? [L.doorA[k - 1], L.doorB[k - 1]] : undefined;
+  // the door's frame k: 0 is the truck itself (null), 1.. its crops once loaded
+  const doorFrame = k => k === 0 ? null : L.doorA[k] && L.doorB[k] ? [L.doorA[k], L.doorB[k]] : undefined;
   const wheelFrame = k => L.wheels[k];
+
+  // a pixel of linear light, premultiplied, the stop put back: its highlights rolled off as
+  // Khronos PBR Neutral rolls them, a glow over the page where it has no alpha of its own (the
+  // beams), written as straight sRGB bytes
+  const START = 0.76, DD = 1 - START;
+  function put(out, o, r, g, b, al, scale) {
+    r *= scale; g *= scale; b *= scale;
+    const peak = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    const glow = peak > 1 ? 1 : peak;
+    const oa = al > glow ? al : glow;
+    if (peak > START) {
+      const np = 1 - DD * DD / (peak + DD - START), k = np / peak;
+      const mix = 1 - 1 / (0.15 * (peak - np) + 1);
+      r = (r * k) * (1 - mix) + np * mix; g = (g * k) * (1 - mix) + np * mix; b = (b * k) * (1 - mix) + np * mix;
+    }
+    if (oa > 0.002) {
+      const inv = 1 / oa;
+      out[o] = enc(r * inv); out[o + 1] = enc(g * inv); out[o + 2] = enc(b * inv); out[o + 3] = oa * 255 + 0.5;
+    } else out[o + 3] = 0;
+  }
 
   function compose() {
     if (!M || !L.A) return;
     const [cr, cg, cb] = hsv(S.hue, S.sat, S.val);
     const D = M.door, Wh = M.wheels, Li = M.lights;
-    const [df0, df1, dt] = between(S.door, 8, doorFrame);
-    const [w0, w1, wt] = between((S.steer + 1) / 2, 8, wheelFrame);
-    const d0 = df0 && df0[0], d1 = df1 && df1[0], e0 = df0 && df0[1], e1 = df1 && df1[1];
-    const doorOn = !!(d0 || d1);
+    const df = nearest(S.door, D.frames, doorFrame);              // null: the door shut
+    const wf = nearest((S.steer + 1) / 2, Wh.frames - 1, wheelFrame);
+    const dA = df && df[0], dB = df && df[1];
     const out = cImg.data, tout = tImg.data, scale = M.scale;
-    const start = 0.76, dd = 1 - start;
     const ww = work.w, wh = work.h;
     for (let y = 0; y < wh; y++) {
       const gy = y + work.y;
@@ -126,59 +156,59 @@
         const gx = x + work.x, gi = gy * W + gx, oi = y * ww + x;
         let ar = L.A.p[3 * gi], ag = L.A.p[3 * gi + 1], ab = L.A.p[3 * gi + 2], al = L.A.a[gi];
         let br = L.B.p[3 * gi], bg = L.B.p[3 * gi + 1], bb = L.B.p[3 * gi + 2];
-        // the door, between two of its frames (frame 0 is the truck itself)
-        if (doorOn && gx >= D.x && gx < D.x + D.w && gy >= D.y && gy < D.y + D.h) {
-          const di = (gy - D.y) * D.w + (gx - D.x), q = 3 * di, u = 1 - dt;
-          // the first frame: the truck itself (frame 0) or a crop
-          let a0r = ar, a0g = ag, a0b = ab, b0r = br, b0g = bg, b0b = bb, al0 = al;
-          if (d0) { a0r = d0.p[q]; a0g = d0.p[q + 1]; a0b = d0.p[q + 2]; al0 = d0.a[di]; b0r = e0.p[q]; b0g = e0.p[q + 1]; b0b = e0.p[q + 2]; }
-          let a1r = a0r, a1g = a0g, a1b = a0b, b1r = b0r, b1g = b0g, b1b = b0b, al1 = al0;
-          if (d1) { a1r = d1.p[q]; a1g = d1.p[q + 1]; a1b = d1.p[q + 2]; al1 = d1.a[di]; b1r = e1.p[q]; b1g = e1.p[q + 1]; b1b = e1.p[q + 2]; }
-          ar = a0r * u + a1r * dt; ag = a0g * u + a1g * dt; ab = a0b * u + a1b * dt;
-          br = b0r * u + b1r * dt; bg = b0g * u + b1g * dt; bb = b0b * u + b1b * dt;
-          al = al0 * u + al1 * dt;
+        // the door at the frame nearest its opening
+        if (dA && gx >= D.x && gx < D.x + D.w && gy >= D.y && gy < D.y + D.h) {
+          const q = 4 * ((gy - D.y) * D.w + (gx - D.x)), da = dA.d, db = dB.d;
+          al = da[q + 3] / 255;
+          const bl = db[q + 3] / 255;
+          ar = LIN[da[q]] * al; ag = LIN[da[q + 1]] * al; ab = LIN[da[q + 2]] * al;
+          br = LIN[db[q]] * bl; bg = LIN[db[q + 1]] * bl; bb = LIN[db[q + 2]] * bl;
         }
         // the paint: black paint plus the color times what white paint adds
         let r = br + cr * (ar - br), g = bg + cg * (ag - bg), b = bb + cb * (ab - bb);
         // the front wheels, over the truck
-        if (w0 && gx >= Wh.x && gx < Wh.x + Wh.w && gy >= Wh.y && gy < Wh.y + Wh.h) {
-          const wi = (gy - Wh.y) * Wh.w + (gx - Wh.x);
-          const wa = w0.a[wi] + (w1.a[wi] - w0.a[wi]) * wt;
+        if (wf && gx >= Wh.x && gx < Wh.x + Wh.w && gy >= Wh.y && gy < Wh.y + Wh.h) {
+          const q = 4 * ((gy - Wh.y) * Wh.w + (gx - Wh.x)), wd = wf.d, wa = wd[q + 3] / 255;
           if (wa > 0) {
             const k = 1 - wa;
-            r = w0.p[3 * wi] + (w1.p[3 * wi] - w0.p[3 * wi]) * wt + r * k;
-            g = w0.p[3 * wi + 1] + (w1.p[3 * wi + 1] - w0.p[3 * wi + 1]) * wt + g * k;
-            b = w0.p[3 * wi + 2] + (w1.p[3 * wi + 2] - w0.p[3 * wi + 2]) * wt + b * k;
+            r = LIN[wd[q]] * wa + r * k; g = LIN[wd[q + 1]] * wa + g * k; b = LIN[wd[q + 2]] * wa + b * k;
             al = wa + al * k;
           }
         }
         mask[oi] = al;
-        // the light the headlights add
+        // the light the headlights add, on the truck, in the air and on the floor: it moves with the truck
         if (S.lights && L.lights && gx >= Li.x && gx < Li.x + Li.w && gy >= Li.y && gy < Li.y + Li.h) {
           const li = 3 * ((gy - Li.y) * Li.w + (gx - Li.x));
           r += L.lights.p[li]; g += L.lights.p[li + 1]; b += L.lights.p[li + 2];
         }
-        // the stop back, and the highlights rolled off as Khronos PBR Neutral rolls them
-        r *= scale; g *= scale; b *= scale;
-        let peak = r > g ? (r > b ? r : b) : (g > b ? g : b);
-        const glow = peak > 1 ? 1 : peak;
-        const oa = al > glow ? al : glow;
-        if (peak > start) {
-          const np = 1 - dd * dd / (peak + dd - start), k = np / peak;
-          const mix = 1 - 1 / (0.15 * (peak - np) + 1);
-          r = (r * k) * (1 - mix) + np * mix; g = (g * k) * (1 - mix) + np * mix; b = (b * k) * (1 - mix) + np * mix;
-        }
-        const o = 4 * oi;
-        if (oa > 0.002) {
-          const inv = 1 / oa;
-          out[o] = enc(r * inv); out[o + 1] = enc(g * inv); out[o + 2] = enc(b * inv); out[o + 3] = oa * 255 + 0.5;
-        } else out[o + 3] = 0;
-        tout[o + 3] = al * 255 + 0.5;
+        put(out, 4 * oi, r, g, b, al, scale);
+        tout[4 * oi + 3] = al * 255 + 0.5;
       }
     }
     composed.getContext('2d').putImageData(cImg, 0, 0);
     tint.getContext('2d').putImageData(tImg, 0, 0);
     outlineFor();
+    composeGround();
+  }
+
+  // The ground: the floor round the truck, its shadow and the truck's reflection in it, which takes
+  // the paint's color. It stays put while the truck squashes and leans over it. Composed again only
+  // when the color changes; the door, the wheels and the lights leave it be.
+  let groundWork = null, groundCanvas = null, gImg = null, groundKey = '';
+  function composeGround() {
+    if (!L.gA || !groundCanvas) return;
+    const key = [S.hue, S.sat, S.val].join();
+    if (key === groundKey) return;
+    groundKey = key;
+    const [cr, cg, cb] = hsv(S.hue, S.sat, S.val);
+    const gw = groundWork, out = gImg.data, scale = M.scale, A = L.gA, B = L.gB;
+    for (let i = 0; i < gw.w * gw.h; i++) {
+      const r = B.p[3 * i] + cr * (A.p[3 * i] - B.p[3 * i]);
+      const g = B.p[3 * i + 1] + cg * (A.p[3 * i + 1] - B.p[3 * i + 1]);
+      const b = B.p[3 * i + 2] + cb * (A.p[3 * i + 2] - B.p[3 * i + 2]);
+      put(out, 4 * i, r, g, b, A.a[i], scale);
+    }
+    groundCanvas.getContext('2d').putImageData(gImg, 0, 0);
   }
   // the outline: the truck's shape grown by the band, less the shape itself
   const MARGIN = 16;
@@ -217,14 +247,8 @@
     const G = ground(), [sx, sy] = squash();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // a soft shadow where the wheels meet the ground
-    const tr = M.truck.rect, rx = tr[2] * 0.5 * sx, ry = 30;
-    ctx.save();
-    ctx.translate(OX + G.x, OY + G.y - 8); ctx.scale(1, ry / rx);
-    const sh = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
-    sh.addColorStop(0, 'rgba(0,0,0,0.55)'); sh.addColorStop(0.6, 'rgba(0,0,0,0.25)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    // the ground, still, under the truck
+    if (groundCanvas) ctx.drawImage(groundCanvas, OX + groundWork.x, OY + groundWork.y);
     ctx.setTransform(sx, 0, -S.lean, sy, OX + G.x - sx * G.x + S.lean * G.y, OY + G.y - sy * G.y);
     ctx.drawImage(composed, work.x, work.y);
     if (active && !drag && outline) ctx.drawImage(outline, work.x - MARGIN, work.y - MARGIN);
@@ -484,8 +508,9 @@
   // ----- start: the truck as it first shows, then the door's and the wheels' other frames -----
   fetch(ROOT + 'truck.json' + VERSION).then(r => r.json()).then(async m => {
     M = m; [W, H] = m.size;
-    M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.lights = rect(m.lights.rect);
-    M.door.frames = m.door.frames; M.wheels.frames = m.wheels.frames;
+    const doorFrames = m.door.frames, wheelFrames = m.wheels.frames;   // before M (which is m) swaps these for rects
+    M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.ground = rect(m.ground.rect); M.lights = rect(m.lights.rect);
+    M.door.frames = doorFrames; M.wheels.frames = wheelFrames;
     S.hue = m.paint[0]; S.sat = m.paint[1]; S.val = m.paint[2];
     OX = Math.round(W * PAD); OY = Math.round(H * PAD);
     canvas.width = W + 2 * OX; canvas.height = H + 2 * OY;
@@ -501,17 +526,22 @@
       tImg.data[4 * i] = REGION[0] * 255; tImg.data[4 * i + 1] = REGION[1] * 255; tImg.data[4 * i + 2] = REGION[2] * 255;
     }
     mask = new Float32Array(work.w * work.h);
-    const [a, b, w4, li] = await Promise.all(['base_A', 'base_B', 'wheels_4', 'lights'].map(image));
-    L.A = decode(a); L.B = decode(b); L.wheels[4] = decode(w4); L.lights = decode(li, true);
+    groundWork = M.ground;
+    groundCanvas = document.createElement('canvas'); groundCanvas.width = groundWork.w; groundCanvas.height = groundWork.h;
+    gImg = new ImageData(groundWork.w, groundWork.h);
+    const mid = (M.wheels.frames - 1) / 2;
+    const first = await Promise.all(['base_A', 'base_B', 'wheels_' + mid, 'lights', 'ground_A', 'ground_B'].map(image));
+    L.A = decode(first[0]); L.B = decode(first[1]); L.wheels[mid] = pixels(first[2]); L.lights = decode(first[3], true);
+    L.gA = decode(first[4]); L.gB = decode(first[5]);
     resize(); compose(); draw();
     stage.classList.add('is-ready');
     setHint(hintFor());
     // the rest, in the background
-    for (let k = 1; k <= 8; k++) {
-      Promise.all([image('door_A_' + k), image('door_B_' + k)]).then(([da, db]) => { L.doorA[k - 1] = decode(da); L.doorB[k - 1] = decode(db); });
+    for (let k = 1; k <= M.door.frames; k++) {
+      Promise.all([image('door_A_' + k), image('door_B_' + k)]).then(([da, db]) => { L.doorA[k] = pixels(da); L.doorB[k] = pixels(db); });
     }
-    for (let k = 0; k <= 8; k++) if (k !== 4) image('wheels_' + k).then(img => { L.wheels[k] = decode(img); });
-  }).catch(() => { /* the poster stays */ });
+    for (let k = 0; k < M.wheels.frames; k++) if (k !== mid) image('wheels_' + k).then(img => { L.wheels[k] = pixels(img); });
+  }).catch(e => { stage.dataset.error = String(e && e.message || e); /* the poster stays */ });
 
   // for tests: set the state, hover a button, open the menu
   window.SS_TRUCK = { S, set: o => { Object.assign(S, o); compose(); draw(); }, hover: k => { active = true; hover = k; draw(); },
