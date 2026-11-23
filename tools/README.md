@@ -18,14 +18,23 @@ again. Edit `docs/docs.js` (the clip player) by hand; the build leaves it alone.
 The truck you can hover and drag on the home page (`truck.js`) is a set of
 renders in `truck/`: the truck with white and with black paint (so the page
 can recolor it), the door at 16 more angles, the front wheels at 17 steering
-angles (the page shows the nearest, never a blend of two), and the light the
-headlights add, and a dark, feathered disk for the truck to stand on: a circle
-on the ground round its tires (`DISK_CENTER`, `DISK_RADIUS` in meters, in
-`render_web.py`), feathered by distance on the ground so it follows the
-perspective. How dark it is, and how far out it stays that dark before it
-fades, are `DARK` and `CORE` in `pack_web.py`. Remake them
-after changing the truck in Blender. Rendering takes two to three minutes. The page
-reads the frame counts and sizes from `truck/truck.json`, so it needs no change.
+angles (the page shows the nearest, never a blend of two), the light the
+headlights add, and a dark, feathered disk for the truck to stand on. Remake
+them after changing the truck in Blender. Rendering takes two to three minutes.
+The page reads the frame counts and sizes from `truck/truck.json`, so it needs
+no change.
+
+**Changing the disk needs no render.** Its shape is `DISK` in `pack_web.py`:
+its middle on the ground and three radii (toward the truck's rear, its front
+and its sides), in meters, then how dark it is and how far out (`core`, a
+fraction of the radius) it stays that dark before it fades. Run step 3 alone
+on the layers you rendered last, then steps 4 and 5.
+
+**Changing how large the truck shows needs neither.** It's `--truck-zoom` at
+the top of the truck's rules in `style.css` (1 is the size it was rendered
+at; 1.15 draws the truck and its disk 15% larger in the same space). Change it,
+then steps 4 and 5. Past about 1.2 the renders start to look soft on a sharp
+screen: render wider in step 2 (`1200` in place of `1000`) to keep them crisp.
 
 In **PowerShell** (Start menu, type `PowerShell`, open it), with the truck's
 `.blend` saved:

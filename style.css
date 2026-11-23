@@ -85,9 +85,12 @@ p{margin:0 0 1em;max-width:var(--measure)}
 /* the truck (truck.js): a poster until the layers are in, then the canvas, its Kneady buttons over it.
    The canvas and buttons reach 20% past the stage all round (truck.js PAD), so a stretched or leaning
    truck isn't cut off; they take no clicks there, so the text beside them stays clickable. */
-.truck-stage{position:relative;aspect-ratio:5/4;width:100%;justify-self:center;touch-action:none;margin-bottom:2.6rem}
-.truck-stage canvas,.truck-stage svg{position:absolute;left:-20%;top:-20%;width:140%;height:140%;pointer-events:none}
-.truck-poster{position:absolute;inset:0;width:100%;height:100%}
+/* --truck-zoom: how large the truck and its disk are drawn in their space on the page, about its
+   middle (1 fills the space as rendered); the page's layout stays as it is. The canvas reaches 20%
+   past the space on every side, for the headlights' beams and the disk */
+.truck-stage{--truck-zoom:1.15;position:relative;aspect-ratio:5/4;width:100%;justify-self:center;touch-action:none;margin-bottom:2.6rem}
+.truck-stage canvas,.truck-stage svg{position:absolute;left:calc(50% - 70% * var(--truck-zoom));top:calc(50% - 70% * var(--truck-zoom));width:calc(140% * var(--truck-zoom));height:calc(140% * var(--truck-zoom));pointer-events:none}
+.truck-poster{position:absolute;left:calc(50% - 50% * var(--truck-zoom));top:calc(50% - 50% * var(--truck-zoom));width:calc(100% * var(--truck-zoom));height:calc(100% * var(--truck-zoom))}
 .truck-stage canvas{opacity:0}
 .truck-stage.is-ready canvas{opacity:1}
 .truck-stage.is-ready .truck-poster{visibility:hidden}

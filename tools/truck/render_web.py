@@ -14,8 +14,8 @@ mode "layers":  every layer, linear light (Standard view, EXPOSURE stops down fo
   lights_on            door_B_0 with the lights on (the page takes door_B_0 from it: the lights' light)
   wheels_k             the front wheels alone (everything else a holdout), steered from full left
                        (k = 0) to full right (k = STEER_FRAMES - 1)
-mode "disk":    only disk.json (the disk under the truck: its middle and radius on the ground, and
-                how a pixel of the render maps onto the ground), with no render.
+mode "disk":    only disk.json (how a pixel of the render maps onto the ground, for the disk under
+                the truck that pack_web.py draws), with no render.
 Every mode writes disk.json; pack_web.py reads it with the layers and turns them into the page's files.
 """
 import bpy, sys, os, math
@@ -89,14 +89,10 @@ def frame_truck():
     print('framed: lens %.2f shift %.3f %.3f' % (cam_data.lens, cam_data.shift_x, cam_data.shift_y), flush=True)
 frame_truck()
 
-# --- the disk under the truck: a circle on the ground round its tires. Greg: the floor "needs to
-# just be a disk with very feathered edges that's darker than the page background". pack_web.py draws
-# it, feathered by distance on the ground, not on the screen: in perspective the far half of a circle
-# is squeezed, and a flat ellipse on the screen left the rear tires in its faint edge.
-# Meters. The tires run from y -5.2 (front) to -0.1 (rear); the middle is pulled back toward the
-# rear, so the rear tires stand well in the dark (Greg: "It needs to extend past the bottom of the
-# rear tires"), and it reaches a little past the front bumper
-DISK_CENTER, DISK_RADIUS = (0.0, -2.2), 4.0
+# --- the disk under the truck: pack_web.py draws it (its size and shape are there, DISK), feathered
+# by distance on the ground, not on the screen: in perspective the far half of a circle is squeezed,
+# and a flat ellipse on the screen left the rear tires in its faint edge. This says how a pixel of the
+# render maps onto the ground.
 def disk_mapping():
     """The 3 x 3 matrix taking a render pixel (x right, y down, as homogeneous (x, y, 1)) to a point on
     the ground (gx, gy, w): fitted to ground points projected through the camera."""
@@ -122,7 +118,7 @@ def disk_mapping():
     return [[float(x) for x in row] for row in m]
 import json
 with open(os.path.join(OUT, 'disk.json'), 'w') as f:
-    json.dump({'center': list(DISK_CENTER), 'radius': DISK_RADIUS, 'to_ground': disk_mapping()}, f)
+    json.dump({'to_ground': disk_mapping()}, f)
 if MODE == 'disk':
     print('disk', open(os.path.join(OUT, 'disk.json')).read(), flush=True)
     sys.exit(0)

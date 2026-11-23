@@ -14,7 +14,8 @@ straight alpha; the page (truck.js) decodes them, works in linear light and puts
                            (opaque: black is none); the page moves it with the truck
   poster.webp              the truck as it first shows, for a browser without JavaScript
   disk                     the dark disk under the truck: black, its alpha feathered by distance on
-                           the ground from the circle in render_web.py's disk.json, at half size
+                           the ground (DISK, below; render_web.py's disk.json maps a pixel onto the
+                           ground), at half size. Changing DISK needs only this script run again
   truck.json               where each crop goes, the frame counts, the truck's middle and ground
 """
 import bpy, sys, os, json, glob, colorsys
@@ -142,29 +143,37 @@ ground_y = int(ys.max())
 # --- the disk under the truck. Greg, 22 November 2026: the floor "needs to just be a disk with very
 # feathered edges that's darker than the page background" - in place of the rendered floor, its
 # orange and the reflection - then "It needs to extend past the bottom of the rear tires".
-# Black, DARK out to CORE of its radius, feathered from there to nothing at its edge, measured on the
-# ground (disk.json maps a pixel onto it), so it follows the perspective: a flat ellipse on the
-# screen left the rear tires in its faint edge. Drawn at half size; the page scales it up
+# Black, `dark` out to `core` of its radius, feathered from there to nothing at its edge, measured on
+# the ground (disk.json maps a pixel onto it), so it follows the perspective: a flat ellipse on the
+# screen left the rear tires in its faint edge. Drawn at half size; the page scales it up.
+# Its middle and radii are meters on the ground, y toward the truck's rear (its tires run from y -5.2
+# at the front to -0.1 at the rear), one radius toward the rear, one toward the front, one to the
+# sides. Greg, of rear 4.0, front 4.0: "The rear of the disc is exactly right. The front looks like it
+# should extend further under the front wheels" - front 5.0 puts the front wheels as deep in the dark
+# as the rear ones
 yy, xx = np.mgrid[0:H, 0:W]
 def ease(t):
     t = np.clip(t, 0.0, 1.0)
     return t * t * (3 - 2 * t)
 fade = ease(np.minimum(np.minimum(xx, W - 1 - xx), np.minimum(yy, H - 1 - yy)) / FADE)
+DISK = {'center': (0.0, -2.2), 'rear': 4.0, 'front': 5.0, 'side': 4.0, 'dark': 0.7, 'core': 0.3}
 with open(os.path.join(SRC, 'disk.json')) as f:
-    disk = json.load(f)
-DARK, CORE = 0.7, 0.3
+    to_ground = np.array(json.load(f)['to_ground'])
 def disk_alpha(u, v):
     """The disk's alpha at render pixels (u, v), x right and y down."""
-    m = np.array(disk['to_ground'])
+    m, d = to_ground, DISK
     gx, gy, w = (m[i, 0] * u + m[i, 1] * v + m[i, 2] for i in range(3))
     ahead = w > 1e-6                                          # below the horizon
     w = np.where(ahead, w, 1.0)
-    r = np.hypot(gx / w - disk['center'][0], gy / w - disk['center'][1]) / disk['radius']
-    return np.where(ahead, DARK * (1.0 - ease((r - CORE) / (1.0 - CORE))), 0.0)
+    dx, dy = gx / w - d['center'][0], gy / w - d['center'][1]
+    r = np.hypot(dx / d['side'], dy / np.where(dy > 0, d['rear'], d['front']))
+    return np.where(ahead, d['dark'] * (1.0 - ease((r - d['core']) / (1.0 - d['core']))), 0.0)
 PAD = 0.2                                                     # the page's canvas reaches this far past the frame
 px0, py0 = -PAD * W, -PAD * H
 dv, du = np.mgrid[0:int(H * (1 + 2 * PAD)) // 2, 0:int(W * (1 + 2 * PAD)) // 2]
-half = disk_alpha(px0 + 2 * du + 1.0, py0 + 2 * dv + 1.0)
+# faded out near the canvas's edges, so a large disk never ends in a line there
+edge = ease(np.minimum(np.minimum(du, du[0, -1] - du), np.minimum(dv, dv[-1, 0] - dv)) / 40.0)
+half = disk_alpha(px0 + 2 * du + 1.0, py0 + 2 * dv + 1.0) * edge
 dr = bbox(half > 0.5 / 255.0, pad=2)
 img = np.zeros(half.shape + (4,), dtype=np.float32); img[..., 3] = half
 sizes['disk'] = save(crop(img, dr), 'disk')
