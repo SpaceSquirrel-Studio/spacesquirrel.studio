@@ -11,12 +11,12 @@ mode "layers":  every layer, linear light (Standard view, EXPOSURE stops down fo
   lights_on            base_B with the lights on (the page takes base_B from it: the lights' own light)
 """
 import bpy, sys, os, math
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 OUT = argv[0]
 MODE = argv[1] if len(argv) > 1 else 'preview'
-RES = int(argv[2]) if len(argv) > 2 else 900
+RES = int(argv[2]) if len(argv) > 2 else 1000           # the width; the frame is 5:4
 EXPOSURE = -1.0            # one stop down: linear values to 2.0 fit in the 8 bits, the page puts it back
 os.makedirs(OUT, exist_ok=True)
 
@@ -24,21 +24,50 @@ scene = bpy.context.scene
 O = bpy.data.objects
 body, door = O['Carpaint'], O['DL']
 
-# --- the camera: three-quarter front, from the truck's left (+X), a little above --------------
+# --- the camera: Greg's viewport, 22 November 2026, low at the truck's front left ---------------
+# Greg: "The top down 3/4 is disorienting. We need to be looking at from the attached angle." His
+# 3D View's view matrix, read from Blender. Its 50 mm viewport lens frames twice a 36 mm sensor's
+# width (Blender's perspective views are zoomed out 2x), so the camera is 25 mm, 72 degrees across.
+VIEW = Matrix(((0.87214, -0.06116, 0.48541, 3.82223),
+               (0.48881, 0.06691, -0.86982, -9.71989),
+               (0.02072, 0.99588, 0.08825, 2.29237),
+               (0.0, 0.0, 0.0, 1.0)))
 cam_data = bpy.data.cameras.new('Web Camera')
-cam_data.lens = 50.0
+cam_data.lens = 25.0
+cam_data.sensor_width = 36.0
+cam_data.sensor_fit = 'HORIZONTAL'
 cam = bpy.data.objects.new('Web Camera', cam_data)
 scene.collection.objects.link(cam)
-target = Vector((0.0, -3.05, 1.45))
-direction = Vector((0.82, -1.0, 0.36)).normalized()
-cam.location = target + direction * 12.0
-cam.rotation_euler = (target - cam.location).to_track_quat('-Z', 'Y').to_euler()
-cam_data.shift_x, cam_data.shift_y = 0.0, 0.0
+cam.matrix_world = VIEW
 scene.camera = cam
 
 r = scene.render
-r.resolution_x = r.resolution_y = RES
+r.resolution_x, r.resolution_y = RES, RES * 4 // 5
 r.resolution_percentage = 100
+
+# --- framing: from that same spot, zoomed in until the truck fills WIDTH of the frame, centered,
+# its wheels FLOOR above the bottom, so the page has room to stretch it upward (truck.js)
+WIDTH, FLOOR = 0.84, 0.06
+def frame_truck():
+    from bpy_extras.object_utils import world_to_camera_view
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    xs, ys = [], []
+    for o in scene.objects:
+        if o.type != 'MESH' or o.name in ('Plane', 'HDRI Controller') or o.hide_render:
+            continue
+        e = o.evaluated_get(dg); m = e.to_mesh(); mw = o.matrix_world
+        for i in range(0, len(m.vertices), 3):
+            p = world_to_camera_view(scene, cam, mw @ m.vertices[i].co)
+            xs.append(p.x); ys.append(p.y)
+        e.to_mesh_clear()
+    k = WIDTH / (max(xs) - min(xs))
+    aspect = r.resolution_x / r.resolution_y
+    cam_data.lens *= k
+    cam_data.shift_x = ((min(xs) + max(xs)) / 2 - 0.5) * k
+    cam_data.shift_y = (0.5 + (min(ys) - 0.5) * k - FLOOR) / aspect
+    print('framed: lens %.2f shift %.3f %.3f' % (cam_data.lens, cam_data.shift_x, cam_data.shift_y), flush=True)
+frame_truck()
 r.image_settings.file_format = 'PNG'
 r.image_settings.color_mode = 'RGBA'
 r.image_settings.color_depth = '16'

@@ -41,8 +41,13 @@
 
   // ----- the truck's state -----
   const S = { hue: 0, sat: 1, val: 0.873, lights: true, door: 0, steer: 0, sy: 1, lean: 0 };
+  const SY_MIN = 0.6, SY_MAX = 1.3, LEAN_MAX = 0.3;
   let M = null;                                     // truck.json
-  let W = 900, H = 900;
+  let W = 1000, H = 800;                            // the render's size; coordinates below are in it
+  // The canvas reaches PAD of the render past the stage on every side (style.css), so a stretched
+  // or leaning truck isn't cut off at the stage's edge. OX, OY: where the render starts in it.
+  const PAD = 0.2;
+  let OX = 0, OY = 0;
 
   // ----- loading and decoding the layers -----
   const LIN = new Float32Array(256);
@@ -192,7 +197,7 @@
 
   // ----- drawing: the truck squashed and leaned about where it meets the ground -----
   const ground = () => ({ x: M.truck.center[0], y: M.truck.ground });
-  function squash() { const sy = S.sy; return [1 / Math.sqrt(sy), sy]; }
+  function squash() { const sy = S.sy; return [Math.pow(sy, -0.35), sy]; }   // squashed, it spreads a little
   function toScreen(p) {
     const G = ground(), [sx, sy] = squash();
     return { x: G.x + sx * (p.x - G.x) - S.lean * (p.y - G.y), y: G.y + sy * (p.y - G.y) };
@@ -208,16 +213,16 @@
     if (!composed) return;
     const G = ground(), [sx, sy] = squash();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     // a soft shadow where the wheels meet the ground
-    const tr = M.truck.rect, rx = tr[2] * 0.5 * sx, ry = 26;
+    const tr = M.truck.rect, rx = tr[2] * 0.5 * sx, ry = 30;
     ctx.save();
-    ctx.translate(G.x, G.y - 6); ctx.scale(1, ry / rx);
+    ctx.translate(OX + G.x, OY + G.y - 8); ctx.scale(1, ry / rx);
     const sh = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
     sh.addColorStop(0, 'rgba(0,0,0,0.55)'); sh.addColorStop(0.6, 'rgba(0,0,0,0.25)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    ctx.setTransform(sx, 0, -S.lean, sy, G.x - sx * G.x + S.lean * G.y, G.y - sy * G.y);
+    ctx.setTransform(sx, 0, -S.lean, sy, OX + G.x - sx * G.x + S.lean * G.y, OY + G.y - sy * G.y);
     ctx.drawImage(composed, work.x, work.y);
     if (active && !drag && outline) ctx.drawImage(outline, work.x - MARGIN, work.y - MARGIN);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -304,11 +309,12 @@
   function drawButtons() {
     svg.replaceChildren();
     if (!M || !active || drag || !shown) return;
+    const root = el('g', { transform: `translate(${OX},${OY})` }, svg);
     const r = radius(), scale = r / 14, cs = centers();
     for (const k in cs) {
       const c = cs[k], def = BUTTONS[k], on = lit(k), under = hover === k;
       const filled = under || on;
-      const g = el('g', { transform: `translate(${c.x.toFixed(1)},${c.y.toFixed(1)})` }, svg);
+      const g = el('g', { transform: `translate(${c.x.toFixed(1)},${c.y.toFixed(1)})` }, root);
       el('circle', { r, fill: under ? BRIGHT : on ? FULL : IDLE,
                      stroke: under && on ? 'rgba(255,255,255,0.9)' : filled ? BRIGHT : COLOR,
                      'stroke-width': (under && on ? 2.5 : 1.5) * scale }, g);
@@ -321,15 +327,15 @@
     // the name of the one under the mouse; an open menu's own button has none (ringed all round)
     if (hover && cs[hover] && !(hover === 'main' && menuOpen)) {
       const place = { color: 'above', lights: 'right', door: 'below', wheels: 'left' }[hover] || 'below';
-      label(el('g', {}, svg), BUTTONS[hover].name, cs[hover], place, true);
+      label(el('g', {}, root), BUTTONS[hover].name, cs[hover], place, true);
     }
   }
 
   // ----- hover, as Kneady does it: the truck, its button, its menu -----
   let active = false, shown = true, hover = null, menuOpen = false, hideTimer = 0, drag = null;
-  function toCanvas(e) {
+  function toCanvas(e) {                            // a pointer, in the render's coordinates
     const b = canvas.getBoundingClientRect();
-    return { x: (e.clientX - b.left) / b.width * W, y: (e.clientY - b.top) / b.height * H };
+    return { x: (e.clientX - b.left) / b.width * canvas.width - OX, y: (e.clientY - b.top) / b.height * canvas.height - OY };
   }
   function onTruck(p) {
     const q = fromScreen(p);
@@ -378,8 +384,8 @@
       if (!drag.axis) return;
       const k = drag.k, s = drag.s;
       if (k === 'main' || k === 'truck') {
-        if (drag.axis === 'y') S.sy = clamp(s.sy * Math.exp(-dy / 180), 0.55, 1.45);
-        else S.lean = clamp(s.lean + dx / 420, -0.42, 0.42);
+        if (drag.axis === 'y') S.sy = clamp(s.sy * Math.exp(-dy / 180), SY_MIN, SY_MAX);
+        else S.lean = clamp(s.lean + dx / 420, -LEAN_MAX, LEAN_MAX);
         redraw();
       } else {
         if (k === 'color') S.hue = s.hue + dx / 400;
@@ -449,10 +455,10 @@
   stage.addEventListener('blur', () => setActive(false));
   stage.addEventListener('keydown', e => {
     const k = e.key; let used = true, again = false;
-    if (k === 'ArrowUp') S.sy = clamp(S.sy * 1.08, 0.55, 1.45);
-    else if (k === 'ArrowDown') S.sy = clamp(S.sy / 1.08, 0.55, 1.45);
-    else if (k === 'ArrowRight') S.lean = clamp(S.lean + 0.05, -0.42, 0.42);
-    else if (k === 'ArrowLeft') S.lean = clamp(S.lean - 0.05, -0.42, 0.42);
+    if (k === 'ArrowUp') S.sy = clamp(S.sy * 1.08, SY_MIN, SY_MAX);
+    else if (k === 'ArrowDown') S.sy = clamp(S.sy / 1.08, SY_MIN, SY_MAX);
+    else if (k === 'ArrowRight') S.lean = clamp(S.lean + 0.05, -LEAN_MAX, LEAN_MAX);
+    else if (k === 'ArrowLeft') S.lean = clamp(S.lean - 0.05, -LEAN_MAX, LEAN_MAX);
     else if (k === 'Enter' || k === ' ') setMenu(!menuOpen);
     else if (k === 'Escape') setMenu(false);
     else if (k === '1') { S.hue += 1 / 8; again = true; }
@@ -466,7 +472,7 @@
   // ----- sizes follow the stage: the buttons stay Kneady's size on screen -----
   function resize() {
     const b = canvas.getBoundingClientRect();
-    if (b.width) unit = W / b.width;
+    if (b.width) unit = canvas.width / b.width;
     outlineFor();
     redraw();
   }
@@ -478,8 +484,9 @@
     M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.lights = rect(m.lights.rect);
     M.door.frames = m.door.frames; M.wheels.frames = m.wheels.frames;
     S.hue = m.paint[0]; S.sat = m.paint[1]; S.val = m.paint[2];
-    canvas.width = W; canvas.height = H;
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    OX = Math.round(W * PAD); OY = Math.round(H * PAD);
+    canvas.width = W + 2 * OX; canvas.height = H + 2 * OY;
+    svg.setAttribute('viewBox', `0 0 ${canvas.width} ${canvas.height}`);
     const tr = rect(m.truck.rect);
     work = union([{ x: tr.x - 4, y: tr.y - 4, w: tr.w + 8, h: tr.h + 8 }, M.door, M.wheels, M.lights]);
     work.x = Math.max(0, work.x); work.y = Math.max(0, work.y);
@@ -506,6 +513,7 @@
   // for tests: set the state, hover a button, open the menu
   window.SS_TRUCK = { S, set: o => { Object.assign(S, o); compose(); draw(); }, hover: k => { active = true; hover = k; draw(); },
                       menu: on => { active = true; setMenu(on); }, ready: () => !!(M && L.A),
-                      state: () => ({ ...S, menuOpen, active, hover, unit, center: M && M.truck.center, ring: radius() * SPACING }),
+                      state: () => ({ ...S, menuOpen, active, hover, unit, center: M && M.truck.center, ring: radius() * SPACING,
+                                      ox: OX, oy: OY, cw: canvas.width, ch: canvas.height }),
                       time: () => { const t = performance.now(); compose(); return performance.now() - t; } };
 })();
