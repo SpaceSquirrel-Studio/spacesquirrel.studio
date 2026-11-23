@@ -18,8 +18,11 @@ again. Edit `docs/docs.js` (the clip player) by hand; the build leaves it alone.
 The truck you can hover and drag on the home page (`truck.js`) is a set of
 renders in `truck/`: the truck with white and with black paint (so the page
 can recolor it), the door at 16 more angles, the front wheels at 17 steering
-angles (the page shows the nearest, never a blend of two), the floor under it
-with its shadow and reflection, and the light the headlights add. Remake them
+angles (the page shows the nearest, never a blend of two), and the light the
+headlights add. The page draws a dark, feathered disk under the truck itself,
+where `render_web.py` works out the ground round the truck would show
+(`DISK_CENTER`, `DISK_RADIUS`); how dark it is, and how far out it stays that
+dark before it fades, are `dark` and `core` in `pack_web.py`. Remake them
 after changing the truck in Blender. Rendering takes about two minutes. The page
 reads the frame counts and sizes from `truck/truck.json`, so it needs no change.
 
@@ -90,7 +93,7 @@ it):
    `git push`
    GitHub Pages updates the site a minute or two later.
 
-If you changed `style.css`, `clay.js` or `docs/docs.js`, run
+If you changed `style.css`, `truck.js` or `docs/docs.js`, run
 `python tools/bump_version.py` and then the build (step 2) again before you
 publish, so browsers load the new files.
 

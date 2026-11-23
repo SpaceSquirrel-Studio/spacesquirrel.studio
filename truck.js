@@ -4,12 +4,11 @@
 //
 // The truck is rendered in Blender as layers (truck/*.webp, made by tools/truck): the truck with
 // white paint and with black paint, the door at more angles, the front wheels at many steering
-// angles, the ground under it (its shadow, and the truck's reflection) and the light the headlights
-// add. They are linear light one stop down; this script composes them in linear light (a paint color
-// is black paint plus the color times the difference) and puts the stop back, so any color, the
-// lights, the door and the wheels all come out as Blender would render them. The door and the
-// wheels show the frame nearest, never a blend. Squash and lean are a 2D squash and slant of the
-// truck; the ground stays put under it.
+// angles and the light the headlights add. They are linear light one stop down; this script
+// composes them in linear light (a paint color is black paint plus the color times the difference)
+// and puts the stop back, so any color, the lights, the door and the wheels all come out as Blender
+// would render them. The door and the wheels show the frame nearest, never a blend. Squash and lean
+// are a 2D squash and slant of the truck; the dark disk it stands on stays put under it.
 //
 // The buttons are drawn as Kneady draws its own (Kneady's draw.py, _draw_buttons): a dark circle
 // edged in the region's color, its icon in a lighter shade of that color with a dark edge, filled
@@ -90,7 +89,7 @@
     }
     return { p, a, w, h };
   }
-  // the truck, its ground and its lights decoded; the door's and the wheels' many frames kept as
+  // the truck and its lights decoded; the door's and the wheels' many frames kept as
   // bytes (a quarter of the memory), decoded at the pixels a frame covers
   const L = { doorA: [], doorB: [], wheels: [] };
 
@@ -188,27 +187,27 @@
     composed.getContext('2d').putImageData(cImg, 0, 0);
     tint.getContext('2d').putImageData(tImg, 0, 0);
     outlineFor();
-    composeGround();
   }
 
-  // The ground: the floor round the truck, its shadow and the truck's reflection in it, which takes
-  // the paint's color. It stays put while the truck squashes and leans over it. Composed again only
-  // when the color changes; the door, the wheels and the lights leave it be.
-  let groundWork = null, groundCanvas = null, gImg = null, groundKey = '';
-  function composeGround() {
-    if (!L.gA || !groundCanvas) return;
-    const key = [S.hue, S.sat, S.val].join();
-    if (key === groundKey) return;
-    groundKey = key;
-    const [cr, cg, cb] = hsv(S.hue, S.sat, S.val);
-    const gw = groundWork, out = gImg.data, scale = M.scale, A = L.gA, B = L.gB;
-    for (let i = 0; i < gw.w * gw.h; i++) {
-      const r = B.p[3 * i] + cr * (A.p[3 * i] - B.p[3 * i]);
-      const g = B.p[3 * i + 1] + cg * (A.p[3 * i + 1] - B.p[3 * i + 1]);
-      const b = B.p[3 * i + 2] + cb * (A.p[3 * i + 2] - B.p[3 * i + 2]);
-      put(out, 4 * i, r, g, b, A.a[i], scale);
+  // The disk the truck stands on: a circle on the ground round it, as the camera sees it (truck.json's
+  // disk, from tools/truck), black, `dark` out to `core` of its radius, feathered from there to
+  // nothing at its edge (most of it is behind the truck, so the feather starts early). Greg, 22
+  // November 2026: the floor "needs to just be a disk with very feathered edges that's darker than the
+  // page background", in place of the rendered floor with its orange and the truck's reflection.
+  let diskCanvas = null;
+  function makeDisk() {
+    const d = M.disk, c = document.createElement('canvas');
+    c.width = canvas.width; c.height = canvas.height;
+    const g = c.getContext('2d');
+    g.translate(OX + d.cx, OY + d.cy); g.scale(1, d.ry / d.rx);
+    const grad = g.createRadialGradient(0, 0, 0, 0, 0, d.rx);
+    for (let i = 0; i <= 16; i++) {                    // as pack_web.py draws it on the poster
+      const r = d.core + (1 - d.core) * i / 16, t = i / 16;
+      grad.addColorStop(r, `rgba(0,0,0,${(d.dark * (1 - t * t * (3 - 2 * t))).toFixed(4)})`);
     }
-    groundCanvas.getContext('2d').putImageData(gImg, 0, 0);
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(0, 0, d.rx, 0, 2 * Math.PI); g.fill();
+    diskCanvas = c;
   }
   // the outline: the truck's shape grown by the band, less the shape itself
   const MARGIN = 16;
@@ -247,8 +246,8 @@
     const G = ground(), [sx, sy] = squash();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // the ground, still, under the truck
-    if (groundCanvas) ctx.drawImage(groundCanvas, OX + groundWork.x, OY + groundWork.y);
+    // the disk, still, under the truck
+    if (diskCanvas) ctx.drawImage(diskCanvas, 0, 0);
     ctx.setTransform(sx, 0, -S.lean, sy, OX + G.x - sx * G.x + S.lean * G.y, OY + G.y - sy * G.y);
     ctx.drawImage(composed, work.x, work.y);
     if (active && !drag && outline) ctx.drawImage(outline, work.x - MARGIN, work.y - MARGIN);
@@ -509,7 +508,7 @@
   fetch(ROOT + 'truck.json' + VERSION).then(r => r.json()).then(async m => {
     M = m; [W, H] = m.size;
     const doorFrames = m.door.frames, wheelFrames = m.wheels.frames;   // before M (which is m) swaps these for rects
-    M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.ground = rect(m.ground.rect); M.lights = rect(m.lights.rect);
+    M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.lights = rect(m.lights.rect);
     M.door.frames = doorFrames; M.wheels.frames = wheelFrames;
     S.hue = m.paint[0]; S.sat = m.paint[1]; S.val = m.paint[2];
     OX = Math.round(W * PAD); OY = Math.round(H * PAD);
@@ -526,13 +525,10 @@
       tImg.data[4 * i] = REGION[0] * 255; tImg.data[4 * i + 1] = REGION[1] * 255; tImg.data[4 * i + 2] = REGION[2] * 255;
     }
     mask = new Float32Array(work.w * work.h);
-    groundWork = M.ground;
-    groundCanvas = document.createElement('canvas'); groundCanvas.width = groundWork.w; groundCanvas.height = groundWork.h;
-    gImg = new ImageData(groundWork.w, groundWork.h);
+    makeDisk();
     const mid = (M.wheels.frames - 1) / 2;
-    const first = await Promise.all(['base_A', 'base_B', 'wheels_' + mid, 'lights', 'ground_A', 'ground_B'].map(image));
+    const first = await Promise.all(['base_A', 'base_B', 'wheels_' + mid, 'lights'].map(image));
     L.A = decode(first[0]); L.B = decode(first[1]); L.wheels[mid] = pixels(first[2]); L.lights = decode(first[3], true);
-    L.gA = decode(first[4]); L.gB = decode(first[5]);
     resize(); compose(); draw();
     stage.classList.add('is-ready');
     setHint(hintFor());

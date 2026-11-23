@@ -11,7 +11,8 @@ mode "layers":  every layer, linear light (Standard view, EXPOSURE stops down fo
   lights_on            door_B_0 with the lights on (the page takes door_B_0 from it: the lights' light)
   wheels_k             the front wheels alone (everything else a holdout), steered from full left
                        (k = 0) to full right (k = STEER_FRAMES - 1)
-pack_web.py turns them into the page's files.
+mode "disk":    only disk.json (where the disk under the truck goes), with no render.
+Every mode writes disk.json; pack_web.py reads it with the layers and turns them into the page's files.
 """
 import bpy, sys, os, math
 from mathutils import Vector, Matrix
@@ -83,6 +84,28 @@ def frame_truck():
     cam_data.shift_y = (0.5 + (min(ys) - 0.5) * k - FLOOR) / aspect
     print('framed: lens %.2f shift %.3f %.3f' % (cam_data.lens, cam_data.shift_x, cam_data.shift_y), flush=True)
 frame_truck()
+
+# --- the disk under the truck: a circle on the ground round its footprint, as the camera sees it.
+# Greg: the floor "needs to just be a disk with very feathered edges that's darker than the page
+# background". The page draws it (truck.js); this says where: its box in the render's pixels.
+DISK_CENTER, DISK_RADIUS = (0.0, -3.0), 3.6       # meters: between the axles, a little past the bumpers
+def disk_on_screen():
+    from bpy_extras.object_utils import world_to_camera_view
+    bpy.context.view_layer.update()
+    xs, ys = [], []
+    for i in range(96):
+        t = 2 * math.pi * i / 96
+        p = world_to_camera_view(scene, cam, Vector((DISK_CENTER[0] + DISK_RADIUS * math.cos(t),
+                                                     DISK_CENTER[1] + DISK_RADIUS * math.sin(t), 0.0)))
+        xs.append(p.x * r.resolution_x); ys.append((1.0 - p.y) * r.resolution_y)
+    return {'cx': round((min(xs) + max(xs)) / 2, 1), 'cy': round((min(ys) + max(ys)) / 2, 1),
+            'rx': round((max(xs) - min(xs)) / 2, 1), 'ry': round((max(ys) - min(ys)) / 2, 1)}
+import json
+with open(os.path.join(OUT, 'disk.json'), 'w') as f:
+    json.dump(disk_on_screen(), f)
+if MODE == 'disk':
+    print('disk', open(os.path.join(OUT, 'disk.json')).read(), flush=True)
+    sys.exit(0)
 r.image_settings.file_format = 'PNG'
 r.image_settings.color_mode = 'RGBA'
 r.image_settings.color_depth = '16'
