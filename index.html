@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=943606">
+<link rel="stylesheet" href="style.css?v=943607">
 </head>
 <body>
 <div class="wrap">
@@ -40,23 +40,11 @@
           <a class="btn btn-quiet" href="#kneady">Watch the demo</a>
         </div>
       </div>
-      <div class="clay-stage" tabindex="0" role="application" aria-label="A Kneady control to try: arrow keys squash and stretch the clay, Enter opens the shape palette, 1 to 4 pick a shape">
-        <svg viewBox="0 0 500 500" aria-hidden="true">
-          <defs>
-            <radialGradient id="clayLight" cx="0.4" cy="0.32" r="0.85">
-              <stop offset="0" stop-color="#E7987A"/>
-              <stop offset="0.5" stop-color="#B9573A"/>
-              <stop offset="1" stop-color="#93452D"/>
-            </radialGradient>
-          </defs>
-          <ellipse cx="250" cy="452" rx="150" ry="14" fill="#000" opacity=".45"/>
-          <path id="clay" fill="url(#clayLight)" stroke="#141414" stroke-width="4" stroke-linejoin="round" stroke-miterlimit="12"/>
-          <g id="clayButton" transform="translate(250,235)" role="button" aria-label="Change shape">
-            <circle r="30" fill="#E6E6E6" stroke="#141414" stroke-width="4"/>
-            <path id="clayButtonIcon" fill="#B9573A"/>
-          </g>
-        </svg>
-        <span class="clay-hint">Hover over the clay</span>
+      <div class="truck-stage" data-src="truck/" tabindex="0" role="application" aria-label="Kneady controls to try, on a truck: the arrow keys squash and lean it, Enter opens its menu, then 1 changes its color, 2 switches its lights, 3 opens its door and 4 turns its wheels">
+        <img class="truck-poster" src="truck/poster.webp" alt="A red cartoon truck with its headlights on" width="900" height="900">
+        <canvas aria-hidden="true"></canvas>
+        <svg aria-hidden="true"></svg>
+        <span class="stage-hint">Hover over the truck</span>
       </div>
     </section>
 
@@ -175,6 +163,6 @@
     </nav>
   </footer>
 </div>
-<script src="clay.js?v=943606"></script>
+<script src="truck.js?v=943607"></script>
 </body>
 </html>

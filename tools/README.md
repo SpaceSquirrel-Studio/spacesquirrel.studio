@@ -11,6 +11,36 @@ again. Edit `docs/docs.js` (the clip player) by hand; the build leaves it alone.
 | `build_docs.py` | Makes every docs page from Kneady's `docs/` and `tutorials/` |
 | `docs_config.json` | Which tutorial clips go in which part of the guide, and what is Pro-only |
 | `bump_version.py` | Bumps the `?v=` number on every page after a CSS or JS change |
+| `truck/render_web.py`, `truck/pack_web.py` | Make the home page's truck (`truck/`), from the truck's `.blend` |
+
+## Remaking the truck on the home page
+
+The truck you can hover and drag on the home page (`truck.js`) is a set of
+renders in `truck/`: the truck with white and with black paint (so the page
+can recolor it), the door at eight more angles, the front wheels at nine
+steering angles, and the light the headlights add. Remake them after changing
+the truck in Blender. The page itself needs no change unless the camera moves.
+
+In **PowerShell** (Start menu, type `PowerShell`, open it), with the truck's
+`.blend` saved:
+
+1. Go to the site folder: `cd $HOME\Projects\spacesquirrel.studio`
+2. Render the layers into a scratch folder (about a minute; Blender opens the
+   file without a window and never saves it):
+   `& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b "<the truck's .blend>" --factory-startup -P tools/truck/render_web.py -- "$env:TEMP\truck_layers" layers 900`
+3. Pack them into `truck/`:
+   `& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --factory-startup -P tools/truck/pack_web.py -- "$env:TEMP\truck_layers" truck`
+4. Look at it in a browser. The page can't read its files straight from disk,
+   so serve the folder with the Python that comes with Blender:
+   `& "C:\Program Files\Blender Foundation\Blender 5.2\5.2\python\bin\python.exe" -m http.server 8000`
+   then open http://localhost:8000 and press **Ctrl+C** in PowerShell when
+   done. Publish as usual.
+
+`render_web.py` sets its own camera and renders the scene as saved (its
+environment, squash and rim color), setting the paint, lights, door and
+steering itself. The color the truck starts in on the page is `PAINT` in
+`pack_web.py`. To see the framing first, use `preview` in place of `layers`
+in step 2: one render, as the scene looks.
 
 ## Each release
 

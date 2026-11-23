@@ -79,26 +79,20 @@ p{margin:0 0 1em;max-width:var(--measure)}
 /* hero */
 .hero{display:grid;grid-template-columns:1.05fr 1fr;align-items:center;gap:2rem;padding:3rem 0 4.5rem}
 .hero p.lede{max-width:44ch}
-.clay-stage{position:relative;aspect-ratio:1/1;max-width:520px;width:100%;justify-self:center;touch-action:none;border-radius:var(--radius-lg)}
-.clay-stage svg{width:100%;height:100%;overflow:visible}
-.clay-stage #clay{transition:stroke .15s,stroke-width .15s;cursor:grab}
-.clay-stage.is-active #clay{stroke:#4772B3;stroke-width:7}
-.clay-stage.is-dragging #clay{cursor:grabbing}
-.clay-stage[data-axis="x"] #clay{cursor:ew-resize}
-.clay-stage[data-axis="y"] #clay{cursor:ns-resize}
-#clayButton{opacity:0;transform-box:fill-box;transform-origin:center;transition:opacity .15s;cursor:pointer;pointer-events:none}
-.clay-stage.is-active #clayButton{opacity:1;pointer-events:auto}
-#clayButton:hover circle{fill:#fff;stroke:#4772B3}
-.clay-hint{position:absolute;left:50%;bottom:0;transform:translateX(-50%);font:600 .95rem/1.3 var(--body);color:var(--ink-soft);background:var(--raised);padding:.5rem .9rem;border-radius:999px;pointer-events:none;text-align:center;width:max-content;max-width:92%}
-#clayPalette .ring-btn{transform:translate(0,0) scale(.3);opacity:0;pointer-events:none;transition:transform .18s ease-out,opacity .14s;cursor:pointer}
-.clay-stage.palette-open #clayPalette .ring-btn{transform:translate(var(--tx),var(--ty)) scale(1);opacity:1;pointer-events:auto}
-#clayPalette .ring-btn circle{fill:#E6E6E6;stroke:#141414;stroke-width:3.5}
-#clayPalette .ring-btn path{fill:#B9573A}
-#clayPalette .ring-btn:hover circle{fill:#fff;stroke:#4772B3}
-#clayPalette .ring-btn.current circle{stroke:#4772B3;stroke-width:5}
-.clay-stage.palette-open #clayButton circle{stroke:#4772B3}
-@media (prefers-reduced-motion:reduce){.clay-stage #clay,#clayButton,#clayPalette .ring-btn{transition:none}}
-@media (max-width:820px){.hero{grid-template-columns:1fr;padding-top:1.5rem}.clay-stage{max-width:380px}}
+/* the truck (truck.js): a poster until the layers are in, then the canvas, its Kneady buttons over it */
+.truck-stage{position:relative;aspect-ratio:1/1;max-width:520px;width:100%;justify-self:center;touch-action:none;border-radius:var(--radius-lg)}
+.truck-stage canvas,.truck-stage svg,.truck-poster{position:absolute;inset:0;width:100%;height:100%}
+.truck-stage canvas{opacity:0}
+.truck-stage.is-ready canvas{opacity:1}
+.truck-stage.is-ready .truck-poster{visibility:hidden}
+.truck-stage svg{pointer-events:none;overflow:visible;font-family:var(--body)}
+.truck-stage.is-active{cursor:grab}
+.truck-stage.on-button{cursor:pointer}
+.truck-stage.is-dragging{cursor:grabbing}
+.truck-stage[data-axis="x"]{cursor:ew-resize}
+.truck-stage[data-axis="y"]{cursor:ns-resize}
+.stage-hint{position:absolute;left:50%;bottom:0;transform:translateX(-50%);font:600 .95rem/1.3 var(--body);color:var(--ink-soft);background:var(--raised);padding:.5rem .9rem;border-radius:999px;pointer-events:none;text-align:center;width:max-content;max-width:92%}
+@media (max-width:820px){.hero{grid-template-columns:1fr;padding-top:1.5rem}.truck-stage{max-width:380px}}
 
 /* sections */
 section{padding:4rem 0}
