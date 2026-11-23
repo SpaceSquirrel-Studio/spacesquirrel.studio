@@ -189,26 +189,12 @@
     outlineFor();
   }
 
-  // The disk the truck stands on: a circle on the ground round it, as the camera sees it (truck.json's
-  // disk, from tools/truck), black, `dark` out to `core` of its radius, feathered from there to
-  // nothing at its edge (most of it is behind the truck, so the feather starts early). Greg, 22
-  // November 2026: the floor "needs to just be a disk with very feathered edges that's darker than the
-  // page background", in place of the rendered floor with its orange and the truck's reflection.
-  let diskCanvas = null;
-  function makeDisk() {
-    const d = M.disk, c = document.createElement('canvas');
-    c.width = canvas.width; c.height = canvas.height;
-    const g = c.getContext('2d');
-    g.translate(OX + d.cx, OY + d.cy); g.scale(1, d.ry / d.rx);
-    const grad = g.createRadialGradient(0, 0, 0, 0, 0, d.rx);
-    for (let i = 0; i <= 16; i++) {                    // as pack_web.py draws it on the poster
-      const r = d.core + (1 - d.core) * i / 16, t = i / 16;
-      grad.addColorStop(r, `rgba(0,0,0,${(d.dark * (1 - t * t * (3 - 2 * t))).toFixed(4)})`);
-    }
-    g.fillStyle = grad;
-    g.beginPath(); g.arc(0, 0, d.rx, 0, 2 * Math.PI); g.fill();
-    diskCanvas = c;
-  }
+  // The disk the truck stands on (truck/disk.webp): black, feathered by distance on the ground round
+  // the truck, made by tools/truck at half size. Greg, 22 November 2026: the floor "needs to just be a
+  // disk with very feathered edges that's darker than the page background", in place of the rendered
+  // floor with its orange and the truck's reflection, then "It needs to extend past the bottom of the
+  // rear tires".
+  let diskImg = null;
   // the outline: the truck's shape grown by the band, less the shape itself
   const MARGIN = 16;
   let outline = null;
@@ -247,7 +233,11 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // the disk, still, under the truck
-    if (diskCanvas) ctx.drawImage(diskCanvas, 0, 0);
+    if (diskImg) {
+      const d = M.disk;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(diskImg, OX + d.x, OY + d.y, d.w, d.h);
+    }
     ctx.setTransform(sx, 0, -S.lean, sy, OX + G.x - sx * G.x + S.lean * G.y, OY + G.y - sy * G.y);
     ctx.drawImage(composed, work.x, work.y);
     if (active && !drag && outline) ctx.drawImage(outline, work.x - MARGIN, work.y - MARGIN);
@@ -508,7 +498,7 @@
   fetch(ROOT + 'truck.json' + VERSION).then(r => r.json()).then(async m => {
     M = m; [W, H] = m.size;
     const doorFrames = m.door.frames, wheelFrames = m.wheels.frames;   // before M (which is m) swaps these for rects
-    M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.lights = rect(m.lights.rect);
+    M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.lights = rect(m.lights.rect); M.disk = rect(m.disk.rect);
     M.door.frames = doorFrames; M.wheels.frames = wheelFrames;
     S.hue = m.paint[0]; S.sat = m.paint[1]; S.val = m.paint[2];
     OX = Math.round(W * PAD); OY = Math.round(H * PAD);
@@ -525,10 +515,9 @@
       tImg.data[4 * i] = REGION[0] * 255; tImg.data[4 * i + 1] = REGION[1] * 255; tImg.data[4 * i + 2] = REGION[2] * 255;
     }
     mask = new Float32Array(work.w * work.h);
-    makeDisk();
     const mid = (M.wheels.frames - 1) / 2;
-    const first = await Promise.all(['base_A', 'base_B', 'wheels_' + mid, 'lights'].map(image));
-    L.A = decode(first[0]); L.B = decode(first[1]); L.wheels[mid] = pixels(first[2]); L.lights = decode(first[3], true);
+    const first = await Promise.all(['base_A', 'base_B', 'wheels_' + mid, 'lights', 'disk'].map(image));
+    L.A = decode(first[0]); L.B = decode(first[1]); L.wheels[mid] = pixels(first[2]); L.lights = decode(first[3], true); diskImg = first[4];
     resize(); compose(); draw();
     stage.classList.add('is-ready');
     setHint(hintFor());

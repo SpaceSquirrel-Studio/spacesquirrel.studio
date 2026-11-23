@@ -19,18 +19,19 @@ The truck you can hover and drag on the home page (`truck.js`) is a set of
 renders in `truck/`: the truck with white and with black paint (so the page
 can recolor it), the door at 16 more angles, the front wheels at 17 steering
 angles (the page shows the nearest, never a blend of two), and the light the
-headlights add. The page draws a dark, feathered disk under the truck itself,
-where `render_web.py` works out the ground round the truck would show
-(`DISK_CENTER`, `DISK_RADIUS`); how dark it is, and how far out it stays that
-dark before it fades, are `dark` and `core` in `pack_web.py`. Remake them
-after changing the truck in Blender. Rendering takes about two minutes. The page
+headlights add, and a dark, feathered disk for the truck to stand on: a circle
+on the ground round its tires (`DISK_CENTER`, `DISK_RADIUS` in meters, in
+`render_web.py`), feathered by distance on the ground so it follows the
+perspective. How dark it is, and how far out it stays that dark before it
+fades, are `DARK` and `CORE` in `pack_web.py`. Remake them
+after changing the truck in Blender. Rendering takes two to three minutes. The page
 reads the frame counts and sizes from `truck/truck.json`, so it needs no change.
 
 In **PowerShell** (Start menu, type `PowerShell`, open it), with the truck's
 `.blend` saved:
 
 1. Go to the site folder: `cd $HOME\Projects\spacesquirrel.studio`
-2. Render the layers into a scratch folder (about a minute; Blender opens the
+2. Render the layers into a scratch folder (two to three minutes; Blender opens the
    file without a window and never saves it):
    `& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b "<the truck's .blend>" --factory-startup -P tools/truck/render_web.py -- "$env:TEMP\truck_layers" layers 1000`
 3. Pack them into `truck/`:

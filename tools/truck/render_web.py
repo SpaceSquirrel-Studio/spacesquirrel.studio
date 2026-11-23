@@ -8,10 +8,14 @@ mode "layers":  every layer, linear light (Standard view, EXPOSURE stops down fo
   door_A_k / door_B_k  the truck on its ground, white / black paint, lights off, front wheels unseen,
                        the left door open k / DOOR_FRAMES (k = 0 is shut)
   door_T_k             the same without the ground: the truck's own shape, for its alpha
+  door_GA_k / door_GB_k  the ground alone, the truck unseen by the camera but still there for its
+                       shadow and light: what is behind the truck's edges in door_A_k / door_B_k, so
+                       pack_web.py can take it back out of them
   lights_on            door_B_0 with the lights on (the page takes door_B_0 from it: the lights' light)
   wheels_k             the front wheels alone (everything else a holdout), steered from full left
                        (k = 0) to full right (k = STEER_FRAMES - 1)
-mode "disk":    only disk.json (where the disk under the truck goes), with no render.
+mode "disk":    only disk.json (the disk under the truck: its middle and radius on the ground, and
+                how a pixel of the render maps onto the ground), with no render.
 Every mode writes disk.json; pack_web.py reads it with the layers and turns them into the page's files.
 """
 import bpy, sys, os, math
@@ -85,24 +89,40 @@ def frame_truck():
     print('framed: lens %.2f shift %.3f %.3f' % (cam_data.lens, cam_data.shift_x, cam_data.shift_y), flush=True)
 frame_truck()
 
-# --- the disk under the truck: a circle on the ground round its footprint, as the camera sees it.
-# Greg: the floor "needs to just be a disk with very feathered edges that's darker than the page
-# background". The page draws it (truck.js); this says where: its box in the render's pixels.
-DISK_CENTER, DISK_RADIUS = (0.0, -3.0), 3.6       # meters: between the axles, a little past the bumpers
-def disk_on_screen():
+# --- the disk under the truck: a circle on the ground round its tires. Greg: the floor "needs to
+# just be a disk with very feathered edges that's darker than the page background". pack_web.py draws
+# it, feathered by distance on the ground, not on the screen: in perspective the far half of a circle
+# is squeezed, and a flat ellipse on the screen left the rear tires in its faint edge.
+# Meters. The tires run from y -5.2 (front) to -0.1 (rear); the middle is pulled back toward the
+# rear, so the rear tires stand well in the dark (Greg: "It needs to extend past the bottom of the
+# rear tires"), and it reaches a little past the front bumper
+DISK_CENTER, DISK_RADIUS = (0.0, -2.2), 4.0
+def disk_mapping():
+    """The 3 x 3 matrix taking a render pixel (x right, y down, as homogeneous (x, y, 1)) to a point on
+    the ground (gx, gy, w): fitted to ground points projected through the camera."""
+    import numpy as np
     from bpy_extras.object_utils import world_to_camera_view
     bpy.context.view_layer.update()
-    xs, ys = [], []
-    for i in range(96):
-        t = 2 * math.pi * i / 96
-        p = world_to_camera_view(scene, cam, Vector((DISK_CENTER[0] + DISK_RADIUS * math.cos(t),
-                                                     DISK_CENTER[1] + DISK_RADIUS * math.sin(t), 0.0)))
-        xs.append(p.x * r.resolution_x); ys.append((1.0 - p.y) * r.resolution_y)
-    return {'cx': round((min(xs) + max(xs)) / 2, 1), 'cy': round((min(ys) + max(ys)) / 2, 1),
-            'rx': round((max(xs) - min(xs)) / 2, 1), 'ry': round((max(ys) - min(ys)) / 2, 1)}
+    rows = []
+    for gx in (-8.0, -4.0, 0.0, 4.0, 8.0):
+        for gy in (-10.0, -6.0, -2.0, 2.0, 6.0):
+            p = world_to_camera_view(scene, cam, Vector((gx, gy, 0.0)))
+            if p.z <= 0:
+                continue
+            u, v = p.x * r.resolution_x, (1.0 - p.y) * r.resolution_y
+            # pixel -> ground: (gx, gy) ~ M (u, v, 1)
+            rows.append([u, v, 1, 0, 0, 0, -gx * u, -gx * v, -gx])
+            rows.append([0, 0, 0, u, v, 1, -gy * u, -gy * v, -gy])
+    m = np.linalg.svd(np.array(rows))[2][-1].reshape(3, 3)
+    m /= abs(m[2, 2])
+    # its sign is free: make w positive for a pixel of ground in front of the camera, so a negative
+    # w means above the horizon
+    if m[2] @ np.array(rows[0][:3]) < 0:
+        m = -m
+    return [[float(x) for x in row] for row in m]
 import json
 with open(os.path.join(OUT, 'disk.json'), 'w') as f:
-    json.dump(disk_on_screen(), f)
+    json.dump({'center': list(DISK_CENTER), 'radius': DISK_RADIUS, 'to_ground': disk_mapping()}, f)
 if MODE == 'disk':
     print('disk', open(os.path.join(OUT, 'disk.json')).read(), flush=True)
     sys.exit(0)
@@ -145,12 +165,23 @@ def lights(on):
 for n in FRONT:
     O[n].visible_camera = False
 lights(False)
+# what the camera doesn't see of the truck when it renders the ground alone (the ground and the
+# front wheels it already doesn't)
+truck = [o for o in scene.objects if o.type in {'MESH', 'CURVE', 'VOLUME'} and o is not ground
+         and not o.hide_render and o.visible_camera]
 for k in range(DOOR_FRAMES + 1):
     setp(door, 'Open', k / DOOR_FRAMES)
     ground.hide_render = False
     for white in (True, False):
         paint(white)
         render('door_%s_%d' % ('A' if white else 'B', k))
+    for o in truck:
+        o.visible_camera = False
+    for white in (True, False):
+        paint(white)
+        render('door_G%s_%d' % ('A' if white else 'B', k))
+    for o in truck:
+        o.visible_camera = True
     ground.hide_render = True
     render('door_T_%d' % k)
 ground.hide_render = False
@@ -159,7 +190,9 @@ paint(False); lights(True)
 render('lights_on')
 lights(False)
 
-# the front wheels alone: everything else held out, so the body still hides what it covers
+# the front wheels alone: everything else held out, so the body still hides what it covers. The
+# holdout leaves what is behind in the color of a pixel a wheel only partly covers; pack_web.py takes
+# door_B_0 back out of it, so this is rendered as that was: black paint, the door shut, lights off
 for n in FRONT:
     O[n].visible_camera = True
 held = []
