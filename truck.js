@@ -19,6 +19,9 @@
   const stage = document.querySelector('.truck-stage');
   if (!stage) return;
   const ROOT = stage.dataset.src || 'truck/';
+  // the truck's files are fetched with this script's own ?v=, so a new version of the page loads
+  // the new renders, not ones the browser kept from before (GitHub Pages lets it keep them 10 minutes)
+  const VERSION = (document.currentScript && new URL(document.currentScript.src).search) || '';
   const canvas = stage.querySelector('canvas');
   const ctx = canvas.getContext('2d');
   const svg = stage.querySelector('svg');
@@ -59,7 +62,7 @@
   function image(name) {
     const img = new Image();
     img.decoding = 'async';
-    img.src = ROOT + name + '.webp';
+    img.src = ROOT + name + '.webp' + VERSION;
     return img.decode().then(() => img);
   }
   // premultiplied linear color (3 a pixel) and alpha, from an image's straight sRGB bytes
@@ -479,7 +482,7 @@
   new ResizeObserver(resize).observe(canvas);
 
   // ----- start: the truck as it first shows, then the door's and the wheels' other frames -----
-  fetch(ROOT + 'truck.json').then(r => r.json()).then(async m => {
+  fetch(ROOT + 'truck.json' + VERSION).then(r => r.json()).then(async m => {
     M = m; [W, H] = m.size;
     M.door = rect(m.door.rect); M.wheels = rect(m.wheels.rect); M.lights = rect(m.lights.rect);
     M.door.frames = m.door.frames; M.wheels.frames = m.wheels.frames;

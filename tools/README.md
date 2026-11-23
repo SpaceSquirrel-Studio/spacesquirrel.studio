@@ -27,16 +27,20 @@ In **PowerShell** (Start menu, type `PowerShell`, open it), with the truck's
 1. Go to the site folder: `cd $HOME\Projects\spacesquirrel.studio`
 2. Render the layers into a scratch folder (about a minute; Blender opens the
    file without a window and never saves it):
-   `& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b "<the truck's .blend>" --factory-startup -P tools/truck/render_web.py -- "$env:TEMP\truck_layers" layers 900`
+   `& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b "<the truck's .blend>" --factory-startup -P tools/truck/render_web.py -- "$env:TEMP\truck_layers" layers 1000`
 3. Pack them into `truck/`:
    `& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --factory-startup -P tools/truck/pack_web.py -- "$env:TEMP\truck_layers" truck`
-4. Look at it in a browser. The page can't read its files straight from disk,
+4. Bump the version number, so browsers fetch the new renders instead of ones
+   they kept (the page asks for the truck's files with it):
+   `& "C:\Program Files\Blender Foundation\Blender 5.2\5.2\python\bin\python.exe" tools/bump_version.py`
+5. Look at it in a browser. The page can't read its files straight from disk,
    so serve the folder with the Python that comes with Blender:
    `& "C:\Program Files\Blender Foundation\Blender 5.2\5.2\python\bin\python.exe" -m http.server 8000`
    then open http://localhost:8000 and press **Ctrl+C** in PowerShell when
    done. Publish as usual.
 
-`render_web.py` sets its own camera and renders the scene as saved (its
+`render_web.py` looks from a camera copied from Greg's Blender viewport (`VIEW`
+in the script), zoomed to fit the truck, and renders the scene as saved (its
 environment, squash and rim color), setting the paint, lights, door and
 steering itself. The color the truck starts in on the page is `PAINT` in
 `pack_web.py`. To see the framing first, use `preview` in place of `layers`
