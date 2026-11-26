@@ -81,7 +81,7 @@ it):
 2. Install ffmpeg: `winget install Gyan.FFmpeg`
 3. Install the two Python packages: `python -m pip install markdown-it-py beautifulsoup4`
 4. Get the site: `cd $HOME\Projects` then
-   `git clone https://github.com/SpaceSquirrel-Studio/spacesquirrel.studio.git`
+   `git clone https://github.com/Tangentsmith/spacesquirrel.studio.git`
 5. Close PowerShell and open it again, so it finds ffmpeg.
 
 **Every release** (in **PowerShell**):
