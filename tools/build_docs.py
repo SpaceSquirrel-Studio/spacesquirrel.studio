@@ -444,7 +444,7 @@ def build_index(shell, tuts, guide_toc, version):
     <p>For add-on developers, riggers and character sellers. You can write tutorials in the Kneady tab, include them with an add-on, or attach them to a rig so they are saved in its file.</p>
   </div>
 </div>
-<p class="fineprint">The tutorials' clips and practice scenes are public domain (CC0 1.0): use them for anything. Questions go to the <a href="https://discord.gg/cDD3acK6bM">Space Squirrel Discord</a>.</p>"""
+<p class="fineprint">The tutorials' clips and practice scenes are public domain (CC0 1.0): use them for anything. Questions go to the <a href="https://discord.gg/cDD3acK6bM">Tangentsmith Discord</a>.</p>"""
     (DOCS / "index.html").write_text(page_html(shell, "Docs", "Kneady Controls guide and tutorials.", body,
                                                [("Support", "/support.html"), ("Docs", None)]), encoding="utf-8")
 
